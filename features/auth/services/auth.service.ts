@@ -1,28 +1,25 @@
-import { AuthUser, SignInPayload } from "@/features/auth/types";
+// features/auth/services/auth.service.ts
+import { auth } from '@/core/firebase/firebaseConfig';
+import { AuthUser, SignInPayload } from '@/features/auth/types';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
-const DEMO_CREDENTIALS = {
-  email: "ipktest@ipkwealth.com",
-  password: "Ipk@2025"
-} as const;
+export async function firebaseSignIn({ email, password }: SignInPayload): Promise<AuthUser> {
+  const result = await signInWithEmailAndPassword(auth, email.trim(), password);
 
-export async function signInMock({ email, password }: SignInPayload): Promise<AuthUser> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
-
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (!normalizedEmail) {
-    throw new Error("Please provide an email address.");
-  }
-
-  if (normalizedEmail !== DEMO_CREDENTIALS.email || password !== DEMO_CREDENTIALS.password) {
-    throw new Error("Invalid email or password. Use the demo credentials provided.");
-  }
+  const user = result.user;
+  const token = await user.getIdToken();
 
   return {
-    email: DEMO_CREDENTIALS.email,
-    name: "IPK Wealth Advisor",
-    phone: "+91 98765 55667",
-    gender: "Female",
-    department: "Wealth Advisory"
+    email: user.email ?? '',
+    name: user.displayName ?? 'No Name',
+    phone: user.phoneNumber ?? '',
+    gender: 'N/A',
+    department: 'N/A',
+    uid: user.uid,
+    token,
   };
+}
+
+export async function firebaseSignOut(): Promise<void> {
+  await auth.signOut();
 }

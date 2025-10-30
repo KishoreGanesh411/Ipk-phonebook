@@ -1,14 +1,14 @@
-export type Gender = "Male" | "Female" | "Non-binary" | "Prefer not to say";
-
-export type AuthUser = {
+export interface AuthUser {
   email: string;
   name: string;
-  phone: string;
-  gender: Gender;
-  department: string;
-};
+  phone?: string;
+  gender?: string;
+  department?: string;
+  uid?: string;
+  token?: string;
+}
 
-export type SignInPayload = {
+export interface SignInPayload {
   email: string;
   password: string;
-};
+}

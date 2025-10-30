@@ -22,6 +22,30 @@ export type LeadStatus =
   | "ARCHIVED";
 export type ClientStage = "Prospect" | "Pitch" | "Negotiation" | "Customer";
 
+// Lead pipeline stages used across the app
+export type LeadPipelineStage =
+  | "ACCOUNT_OPENED"
+  | "CLIENT_INTERESTED"
+  | "FIRST_TALK_DONE"
+  | "FOLLOWING_UP"
+  | "HIBERNATED"
+  | "NEW_LEAD"
+  | "NOT_INTERESTED_DORMANT"
+  | "NO_RESPONSE_DORMANT"
+  | "RISKY_CLIENT_DORMANT";
+
+export const PIPELINE_STAGES: LeadPipelineStage[] = [
+  "ACCOUNT_OPENED",
+  "CLIENT_INTERESTED",
+  "FIRST_TALK_DONE",
+  "FOLLOWING_UP",
+  "HIBERNATED",
+  "NEW_LEAD",
+  "NOT_INTERESTED_DORMANT",
+  "NO_RESPONSE_DORMANT",
+  "RISKY_CLIENT_DORMANT",
+];
+
 export type LeadPhone = {
   label: string;
   number: string;
@@ -99,6 +123,8 @@ export type IpkLead = {
   events: LeadEvent[];
   leadScore?: number;
   applications: AccountApplication[];
+  // Current pipeline stage for the lead
+  pipelineStage: LeadPipelineStage;
 };
 
 const toNames = (fullName: string) => {
@@ -120,6 +146,23 @@ const mapLeadToModel = (
   category: LeadCategory,
   index: number
 ): IpkLead => {
+  const deriveStageFromCategory = (
+    cat: LeadCategory
+  ): LeadPipelineStage => {
+    // If category itself is a pipeline stage, use it directly
+    if ((PIPELINE_STAGES as readonly string[]).includes(cat as string)) {
+      return cat as LeadPipelineStage;
+    }
+    // Map special non-stage categories into closest stage
+    switch (cat) {
+      case "Pending Calls":
+        return "FOLLOWING_UP";
+      case "Missed Calls":
+        return "NO_RESPONSE_DORMANT";
+      default:
+        return "NEW_LEAD";
+    }
+  };
   const { firstName, lastName } = toNames(lead.name);
   return {
     id: lead.id ?? `lead-${index}`,
@@ -186,6 +229,7 @@ const mapLeadToModel = (
         submittedAt: randomDateISO(index + 4),
       },
     ],
+    pipelineStage: deriveStageFromCategory(category),
   };
 };
 
