@@ -2,6 +2,7 @@
 import { firebaseSignIn, firebaseSignOut } from '@/features/auth/services/auth.service';
 import { AuthUser, SignInPayload } from '@/features/auth/types';
 import { create } from 'zustand';
+import { storageClear } from '@/core/storage/storage';
 
 type AuthState = {
   user?: AuthUser;
@@ -34,7 +35,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async signOut() {
     await firebaseSignOut();
-    set({ user: undefined });
+    await storageClear();
+    set({ user: undefined, error: undefined });
   },
 
   isSignedIn() {

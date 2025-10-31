@@ -12,3 +12,13 @@ export function formatPhone(input?: string | null): string {
   return digits.replace(/(.{3})/g, "$1 ").trim();
 }
 
+// Converts enum-like labels (e.g., ACCOUNT_OPENED) into human-readable
+// form (e.g., "Account Opened"). If the value already contains spaces,
+// it is returned with each word capitalized for visual consistency.
+export function humanizeEnum(value: string): string {
+  if (!value) return value;
+  const normalized = value.replace(/[_-]+/g, " ");
+  return normalized
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}

@@ -11,7 +11,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@apollo/client": "^4.0.7",
+    "@apollo/client": "^4.0.8",
     "@expo-google-fonts/outfit": "^0.4.3",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",

@@ -30,11 +30,14 @@ export const ProfileModal = memo(function ProfileModal({ visible, onClose, user 
     toast("Photo upload coming soon");
   };
 
-  const handleLogout = () => {
-    signOut();
-    router.replace("/(auth)/sign-in");
-    onClose();
-    toast("Signed out");
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } finally {
+      router.replace("/(auth)/sign-in");
+      onClose();
+      toast("Signed out");
+    }
   };
 
   return (
@@ -86,7 +89,7 @@ export const ProfileModal = memo(function ProfileModal({ visible, onClose, user 
               onPress={handleLogout}
               accessibilityRole="button"
             >
-              <MaterialIcons name="logout" size={16} color="#FFFFFF" />
+              <MaterialIcons name="logout" size={17} color="#FFFFFF" />
               <Text size="sm" weight="semibold" style={styles.logoutLabel}>
                 Logout
               </Text>
@@ -139,16 +142,24 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) =>
       width: "100%",
       maxWidth: 420,
       padding: 0,
-      borderRadius: theme.radii.lg
+      borderRadius: theme.radii.lg,
+      // Web tailwind-style box-border behavior
+      // (ignored on native platforms, safe to include)
+      boxSizing: "border-box" as any,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.card
     },
     content: {
       padding: theme.spacing.lg,
-      gap: theme.spacing.lg
+      gap: theme.spacing.lg,
+      boxSizing: "border-box" as any
     },
     headerRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: theme.spacing.md
+      gap: theme.spacing.md,
+      paddingBottom: theme.spacing.sm
     },
     avatarWrapper: {
       position: "relative"
@@ -190,14 +201,15 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) =>
       gap: theme.spacing.sm
     },
     logoutButton: {
-      alignSelf: "flex-start",
+      alignSelf: "flex-end",
       flexDirection: "row",
       alignItems: "center",
       gap: theme.spacing.xs,
       backgroundColor: theme.colors.error,
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.xs,
-      borderRadius: theme.radii.sm
+      paddingHorizontal: theme.spacing.md * 1.01,
+      paddingVertical: theme.spacing.xs * 1.01,
+      borderRadius: theme.radii.sm,
+      boxSizing: "border-box" as any
     },
     logoutLabel: {
       color: "#FFFFFF"
@@ -215,7 +227,8 @@ const infoStyles = (theme: ReturnType<typeof useTheme>) =>
       borderColor: theme.colors.border,
       borderRadius: theme.radii.md,
       paddingVertical: theme.spacing.sm,
-      paddingHorizontal: theme.spacing.md
+      paddingHorizontal: theme.spacing.md,
+      boxSizing: "border-box" as any
     },
     iconWrapper: {
       height: 32,
