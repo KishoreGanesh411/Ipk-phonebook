@@ -3,14 +3,19 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 
 import { AppSplash } from "@/components/ui/AppSplash";
+import { apolloClient } from "@/core/graphql/apolloClient";
 import { ThemeProvider } from "@/core/theme/ThemeProvider";
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { ApolloProvider } from "@apollo/client/react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const { isSignedIn } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const hydrate = useAuthStore((s) => s.hydrateUserFromGraphQL);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -28,12 +33,22 @@ export default function RootLayout() {
     }
   }, [segments, ready, router, isSignedIn]);
 
+  // Ensure profile is hydrated after app refresh when already signed in
+  useEffect(() => {
+    if (!ready) return;
+    if (user && !hydrated) {
+      hydrate().catch(() => {});
+    }
+  }, [ready, user?.uid, hydrated, hydrate]);
+
   return (
     <SafeAreaProvider>
-    <ThemeProvider>
-      <StatusBar style="auto" />
-      {ready ? <Slot /> : <AppSplash />}
-    </ThemeProvider>
+      <ApolloProvider client={apolloClient}>
+        <ThemeProvider>
+          <StatusBar style="auto" />
+          {ready ? <Slot /> : <AppSplash />}
+        </ThemeProvider>
+      </ApolloProvider>
     </SafeAreaProvider>
   );
 }

@@ -6,9 +6,12 @@ export interface AuthUser {
   department?: string;
   uid?: string;
   token?: string;
+  firebaseToken?: string;
+
 }
 
 export interface SignInPayload {
   email: string;
   password: string;
+
 }

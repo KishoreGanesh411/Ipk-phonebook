@@ -30,7 +30,7 @@ export const SignInScreen = () => {
   const isTablet = width >= 840;
 
   const passwordRef = useRef<TextInput>(null);
-  const { signIn, signingIn, error } = useAuthStore();
+  const { signIn, signingIn, error, hydrateUserFromGraphQL } = useAuthStore();
   const [email, setEmail] = useState(DEMO_EMAIL);
   const [password, setPassword] = useState(DEMO_PASSWORD);
 
@@ -42,12 +42,13 @@ export const SignInScreen = () => {
     }
     try {
       const success = await signIn({ email: email.trim(), password });
-      if (success) {
-        toast("Signed in successfully");
-        router.replace("/(tabs)");
-      } else {
-        toast("Invalid email or password");
+      if (!success) {
+        toast("Incorrect email or password");
+        return;
       }
+      await hydrateUserFromGraphQL();
+      toast("Signed in successfully");
+      router.replace("/(tabs)");
     } catch (err) {
       console.error("SignIn error:", err);
       toast("Something went wrong");
@@ -178,3 +179,4 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) => {
     },
   });
 };
+
