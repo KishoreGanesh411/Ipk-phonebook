@@ -1,14 +1,14 @@
-import { memo } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { memo } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
+import { toast } from "@/components/feedback/Toast";
 import { Card } from "@/components/ui/Card";
 import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/core/theme/ThemeProvider";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { AuthUser } from "@/features/auth/types";
-import { toast } from "@/components/feedback/Toast";
 
 type Props = {
   visible: boolean;
@@ -69,7 +69,7 @@ export const ProfileModal = memo(function ProfileModal({ visible, onClose, user 
                   {user.name}
                 </Text>
                 <Text tone="muted" size="sm">
-                  {user.department}
+                  {user.role}
                 </Text>
               </View>
               <Pressable onPress={onClose} style={styles.closeButton} accessibilityRole="button">
@@ -81,7 +81,7 @@ export const ProfileModal = memo(function ProfileModal({ visible, onClose, user 
               <InfoRow label="Email" value={user.email} icon="mail-outline" />
               <InfoRow label="Mobile" value={user.phone} icon="phone" />
               <InfoRow label="Gender" value={user.gender} icon="person-outline" />
-              <InfoRow label="Department" value={user.department} icon="work-outline" />
+              <InfoRow label="Role" value={user.role} icon="work-outline" />
             </View>
 
             <Pressable
@@ -103,7 +103,7 @@ export const ProfileModal = memo(function ProfileModal({ visible, onClose, user 
 
 type InfoRowProps = {
   label: string;
-  value: string;
+  value?: string | undefined;
   icon: keyof typeof MaterialIcons.glyphMap;
 };
 
@@ -120,7 +120,7 @@ const InfoRow = ({ label, value, icon }: InfoRowProps) => {
         <Text size="sm" tone="muted">
           {label}
         </Text>
-        <Text weight="medium">{value}</Text>
+        <Text weight="medium">{value ?? "-"}</Text>
       </View>
     </View>
   );

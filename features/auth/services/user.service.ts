@@ -7,6 +7,7 @@ export type MeProfile = {
   email: string;
   phone?: string | null;
   gender?: string | null;
+  role?: 'ADMIN' | 'MARKETING' | 'RM' | 'STAFF' | string;
 };
 
 export async function fetchCurrentUser(): Promise<MeProfile | null> {

@@ -111,6 +111,15 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="leads"
+          options={{
+            title: "Leads",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="list-alt" color={color} size={size} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="explore"
           options={{
             title: "Explore",

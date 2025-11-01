@@ -52,10 +52,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: {
           ...current,
           ...me,
+          id: (me as any).id ?? current.id,
           name: me.name ?? current.name ?? 'No Name',
           email: me.email ?? current.email ?? '',
           phone: (me as any).phone ?? current.phone ?? '',
           gender: (me as any).gender ?? current.gender ?? 'N/A',
+          role: (me as any).role ?? current.role,
+          department:
+            (current.department ??
+              ((me as any).role === 'RM'
+                ? 'Relationship Management'
+                : (me as any).role === 'MARKETING'
+                ? 'Marketing'
+                : (me as any).role === 'ADMIN'
+                ? 'Administration'
+                : (me as any).role === 'STAFF'
+                ? 'Operations'
+                : undefined))
         },
         hydrated: true,
       });

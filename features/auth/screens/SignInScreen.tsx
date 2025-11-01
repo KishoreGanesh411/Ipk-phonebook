@@ -13,13 +13,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { toast } from "@/components/feedback/Toast";
-import { LoginButton } from "@/components/ui/LoginButton";
 import { Field } from "@/components/ui/Field";
+import { LoginButton } from "@/components/ui/LoginButton";
 import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/core/theme/ThemeProvider";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 
-const DEMO_EMAIL = "ipktest@ipkwealth.com";
+const DEMO_EMAIL = "bharath@ipkwealth.com";
 const DEMO_PASSWORD = "Ipk@2025";
 
 export const SignInScreen = () => {
