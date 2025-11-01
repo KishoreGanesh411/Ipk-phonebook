@@ -63,7 +63,7 @@ const DialPad: React.FC<DialPadProps> = ({
               value={value}
               onChangeText={onChange}
               keyboardType="phone-pad"
-              placeholder="Enter number"
+              placeholder="Enter Number"
               placeholderTextColor="#9BA1A6"
               className="h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 text-base text-gray-900 dark:text-gray-100 bg-white/80 dark:bg-black/20 mb-2.5"
             />
