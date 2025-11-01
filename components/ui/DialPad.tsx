@@ -569,6 +569,10 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
+    // Fill full height and space content so keypad/action rows
+    // sit flush at the bottom across devices
+    flex: 1,
+    justifyContent: "space-between",
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     paddingHorizontal: 22,

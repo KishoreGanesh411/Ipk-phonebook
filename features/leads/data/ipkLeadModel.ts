@@ -239,3 +239,26 @@ export const ipkLeadPipeline: IpkLead[] = leadCategories.flatMap(
     return records.map((lead, index) => mapLeadToModel(lead, category, index));
   }
 );
+
+// Grouped demo data by category for easy integration in UIs
+// that want to render per-pipeline content using the richer
+// IpkLead model instead of the lightweight Lead type.
+export const ipkPipelineByCategory: Record<LeadCategory, IpkLead[]> =
+  Object.fromEntries(
+    leadCategories.map((category) => [
+      category,
+      (leadCatalogue[category] ?? []).map((lead, index) =>
+        mapLeadToModel(lead, category, index)
+      ),
+    ])
+  ) as Record<LeadCategory, IpkLead[]>;
+
+// Convenience helpers for consumers that need a single call
+// to wire demo data across the whole pipeline UI.
+export function getAllPipelineDemoData() {
+  return {
+    categories: leadCategories,
+    byCategory: ipkPipelineByCategory,
+    all: ipkLeadPipeline,
+  } as const;
+}

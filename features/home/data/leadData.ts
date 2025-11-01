@@ -25,7 +25,9 @@ export type Lead = {
   tone: LeadStatusTone;
 };
 
-export const leadCatalogue: Record<LeadCategory, Lead[]> = {
+// Base seed data (authoritative examples). We'll expand these
+// to ensure each category has at least TARGET_COUNT demo rows.
+const baseLeadCatalogue: Record<LeadCategory, Lead[]> = {
   ACCOUNT_OPENED: [
     { id: "AO-001", name: "Karan Singh", phone: "+91 90000 22121", company: "Singh Capital", status: "Account opened", tone: "success" },
     { id: "AO-002", name: "Sneha Rao", phone: "+971 50 321 7654", company: "Gulf Ventures", status: "Activated", tone: "success" }
@@ -71,3 +73,47 @@ export const leadCatalogue: Record<LeadCategory, Lead[]> = {
     { id: "MC-402", name: "Grace Lee", phone: "+65 8123 4433", company: "Lee Strategic", status: "Request call back", tone: "primary" }
   ]
 };
+
+const TARGET_COUNT = 6;
+
+const pad = (n: number) => n.toString().padStart(3, "0");
+
+function expandLeads(seed: Lead[], category: LeadCategory): Lead[] {
+  const out: Lead[] = [...seed];
+  if (out.length === 0) {
+    // Fallback seed if category accidentally empty
+    out.push({
+      id: `${String(category)}-000`,
+      name: `Demo ${String(category)} 1`,
+      phone: "+91 90000 00001",
+      company: undefined,
+      status: "Demo",
+      tone: "primary",
+    });
+  }
+  let i = 0;
+  while (out.length < TARGET_COUNT) {
+    const src = seed[i % seed.length];
+    const idx = out.length + 1;
+    // Create lightly varied clones to look unique
+    const idPrefix = typeof category === "string" ? category.replace(/\s+/g, "-") : String(category);
+    const suffix = pad(idx);
+    const phoneTail = (100 + idx).toString().slice(-3);
+    out.push({
+      ...src,
+      id: `${idPrefix}-${suffix}`,
+      name: `${src.name} ${idx}`,
+      phone: src.phone.replace(/\d(?=\d{2}$)/g, (d) => d).slice(0, -3) + phoneTail,
+    });
+    i++;
+  }
+  return out;
+}
+
+// Public catalogue export used across the app
+export const leadCatalogue: Record<LeadCategory, Lead[]> = Object.fromEntries(
+  leadCategories.map((category) => [
+    category,
+    expandLeads(baseLeadCatalogue[category] ?? [], category),
+  ])
+) as Record<LeadCategory, Lead[]>;

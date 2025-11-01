@@ -40,10 +40,15 @@ export const dpStyles = StyleSheet.create({
     elevation: 50,
   },
   scrollArea: {
-    flexGrow: 0,
+    // Fill available vertical space so the keypad stays pinned
+    // to the container bottom instead of floating mid-screen
+    flexGrow: 1,
     flexShrink: 1,
   },
   scrollAreaContent: {
+    // Ensure content stretches when there's little to show,
+    // keeping the keypad at the bottom of the screen
+    flexGrow: 1,
     paddingBottom: 8,
   },
   numberContainer: {
