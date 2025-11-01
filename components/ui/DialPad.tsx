@@ -1,5 +1,4 @@
 import { useTheme } from "@/core/theme/ThemeProvider";
-import { formatPhone } from "@/core/utils/format";
 import { useContacts } from "@/features/contacts/hooks/useContacts";
 import { IpkLead, ipkLeadPipeline } from "@/features/leads/data/ipkLeadModel";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -14,10 +13,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useWindowDimensions } from "react-native";
 import {
   dpStyles,
   getActionIconSizeStyles,
@@ -46,12 +45,12 @@ const KEY_HINTS: Record<string, string | undefined> = {
   "0": "+",
 };
 
-const DEFAULT_COUNTRY_CODE = ""; // don't show +91 by default
+const DEFAULT_COUNTRY_CODE = "";
 
 const sanitizeNumber = (input: string = "") =>
   input.replace(/[^\d+]/g, "");
 
-const ensureCountryCode = (raw: string) => raw ?? ""; // keep user's input as-is for display
+const ensureCountryCode = (raw: string) => raw ?? "";
 
 type DialPadProps = {
   visible: boolean;
@@ -72,8 +71,9 @@ export const DialPad: React.FC<DialPadProps> = ({
   const { contacts } = useContacts();
   const ipkLeads = ipkLeadPipeline;
   const insets = useSafeAreaInsets();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const isDark = theme.scheme === "dark";
+
   const [value, setValue] = useState(
     initialNumber ? ensureCountryCode(initialNumber) : DEFAULT_COUNTRY_CODE
   );
@@ -106,19 +106,17 @@ export const DialPad: React.FC<DialPadProps> = ({
   }, [activeLead, ipkLeads]);
 
   const pointerEvents = visible ? "auto" : "none";
-  const query = (search || value).trim();
-  // Dialer display: show digits grouped by 3s with spaces, hide country code while typing
   const numberDisplay = useMemo(() => {
     const digits = String(value || "").replace(/\D+/g, "");
-    if (!digits) return "Enter number";
+    if (!digits) return "Enter Number";
     return digits.replace(/(.{3})/g, "$1 ").trim();
   }, [value]);
+
   const callerIdentity = contacts?.[0];
   const normalizedDial = useMemo(() => sanitizeNumber(value), [value]);
   const matchedLead = useMemo(() => {
     if (!normalizedDial) return null;
     const digitsOnly = normalizedDial.replace(/\D+/g, "");
-    // Avoid matching on default country code; require at least 5 digits of the local number
     if (digitsOnly.length < 5) return null;
     return (
       ipkLeads.find((lead) => {
@@ -143,12 +141,10 @@ export const DialPad: React.FC<DialPadProps> = ({
   const callAsDisplayPhone =
     currentLead?.phone ?? callerIdentity?.phone ?? "Select a lead";
 
-  // Filter IPK leads by number prefix (e.g., 944) or name contains.
   const filteredLeads = useMemo(() => {
     const searchText = (search || "").trim().toLowerCase();
     const searchDigits = (search || "").replace(/[^\d]/g, "");
     const dialDigits = (normalizedDial || "").replace(/[^\d]/g, "");
-    // Only use dial digits if user typed more than country code; require >= 3 digits beyond defaults
     const effectiveDialDigits = dialDigits.length >= 3 ? dialDigits : "";
 
     const hasTextQuery = searchText.length >= 2;
@@ -190,7 +186,6 @@ export const DialPad: React.FC<DialPadProps> = ({
   const handleCall = () => {
     const raw = value.trim();
     if (!raw) return;
-    // If user didn't type a country code and provided 10 digits, assume +91 for call
     const digits = raw.replace(/\D+/g, "");
     const isInternational = raw.startsWith("+");
     const toDial = !isInternational && digits.length === 10 ? `+91${digits}` : raw;
@@ -232,7 +227,7 @@ export const DialPad: React.FC<DialPadProps> = ({
           style={[
             styles.sheet,
             {
-              backgroundColor: theme.scheme === "dark" ? "#0F172A" : "#FFFFFF",
+              backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
               transform: [
                 {
                   translateY: anim.interpolate({
@@ -246,14 +241,8 @@ export const DialPad: React.FC<DialPadProps> = ({
             },
           ]}
         >
-
-          {/* Scrollable content to prevent keypad clipping */}
-          <ScrollView
-            style={dpStyles.scrollArea}
-            contentContainerStyle={dpStyles.scrollAreaContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
+          {/* Top fixed search + call-as bars */}
+          <View style={styles.topFixed}>
             <View
               style={[
                 styles.searchField,
@@ -279,29 +268,29 @@ export const DialPad: React.FC<DialPadProps> = ({
               )}
             </View>
 
-            {!(search?.length || normalizedDial.replace(/\D+/g, "").length) && (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={[
-                  styles.callAsRow,
-                  {
-                    backgroundColor: isDark ? "#111826" : "#FFFFFF",
-                    borderColor: isDark ? "#1F2937" : "#E5E7EB",
-                  },
-                ]}
-                onPress={() => setLeadSheetOpen(true)}
-              >
-                <Text style={[styles.callAsLabel, { color: isDark ? "#94A3B8" : "#6B7280" }]}>Call as</Text>
-                <View style={styles.callAsContent}>
-                  <Text style={[styles.callAsName, { color: isDark ? "#F8FAFC" : "#111827" }]}>{callAsDisplayName}</Text>
-                  <Text style={[styles.callAsPhone, { color: isDark ? "#CBD5F5" : "#6B7280" }]}>{callAsDisplayPhone}</Text>
-                </View>
-                <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-
-            <View style={[styles.numberDisplay, dpStyles.numberContainer]}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.callAsRow,
+                {
+                  backgroundColor: isDark ? "#111826" : "#FFFFFF",
+                  borderColor: isDark ? "#1F2937" : "#E5E7EB",
+                },
+              ]}
+              onPress={() => setLeadSheetOpen(true)}
             >
+              <Text style={[styles.callAsLabel, { color: isDark ? "#94A3B8" : "#6B7280" }]}>Call as</Text>
+              <View style={styles.callAsContent}>
+                <Text style={[styles.callAsName, { color: isDark ? "#F8FAFC" : "#111827" }]}>{callAsDisplayName}</Text>
+                <Text style={[styles.callAsPhone, { color: isDark ? "#CBD5F5" : "#6B7280" }]}>{callAsDisplayPhone}</Text>
+              </View>
+              <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Centered number display & optional leads list */}
+          <View style={styles.topContent}>
+            <View style={[styles.numberDisplay, dpStyles.numberContainer]}>
               <Text
                 style={[styles.numberText, dpStyles.numberTextFit, { color: isDark ? "#F8FAFC" : "#111827" }]}
                 numberOfLines={1}
@@ -312,38 +301,41 @@ export const DialPad: React.FC<DialPadProps> = ({
                 {numberDisplay}
               </Text>
             </View>
-            {/* Lead results list (replaces suggestions card) */}
-              {filteredLeads.map((lead) => (
-                <TouchableOpacity
-                  key={lead.id}
-                  style={styles.resultRow}
-                  activeOpacity={0.85}
-                  onPress={() => handleSelectLead(lead)}
-                >
-                  <View style={styles.resultAvatar}>
-                    <Text style={styles.resultAvatarText}>
-                      {(lead.name || "?")
-                        .split(" ")
-                        .map((c) => c.charAt(0))
-                        .slice(0, 2)
-                        .join("")
-                        .toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.resultName, { color: isDark ? "#F8FAFC" : "#111827" }]} numberOfLines={1}>
-                      {lead.name || "Unknown"}
-                    </Text>
-                    <Text style={[styles.resultPhone, { color: isDark ? "#94A3B8" : "#6B7280" }]} numberOfLines={1}>
-                      {lead.phone}
-                    </Text>
-                  </View>
-                  <MaterialIcons name="chevron-right" size={22} color="#9CA3AF" />
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
 
-          {/* Keypad anchored to container bottom */}
+            {filteredLeads.map((lead) => (
+              <TouchableOpacity
+                key={lead.id}
+                style={styles.resultRow}
+                activeOpacity={0.85}
+                onPress={() => handleSelectLead(lead)}
+              >
+                <View style={styles.resultAvatar}>
+                  <Text style={styles.resultAvatarText}>
+                    {(lead.name || "?")
+                      .split(" ")
+                      .map((c) => c.charAt(0))
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.resultName, { color: isDark ? "#F8FAFC" : "#111827" }]} numberOfLines={1}>
+                    {lead.name || "Unknown"}
+                  </Text>
+                  <Text style={[styles.resultPhone, { color: isDark ? "#94A3B8" : "#6B7280" }]} numberOfLines={1}>
+                    {lead.phone}
+                  </Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Spacer */}
+          <View style={{ height: 8 }} />
+
+          {/* Keypad grid */}
           <View style={styles.padGrid}>
             {KEY_ROWS.map((row) => (
               <View key={row.join("-")} style={styles.row}>
@@ -357,9 +349,13 @@ export const DialPad: React.FC<DialPadProps> = ({
                     activeOpacity={0.85}
                     onPress={() => handleDigit(digit)}
                   >
-                    <Text style={[styles.keyLabel, getKeyLabelSizeStyles(screenWidth)]}>{digit}</Text>
+                    <Text style={[styles.keyLabel, getKeyLabelSizeStyles(screenWidth)]}>
+                      {digit}
+                    </Text>
                     {KEY_HINTS[digit] && (
-                      <Text style={[styles.keyHint, getKeyHintSizeStyles(screenWidth)]}>{KEY_HINTS[digit]}</Text>
+                      <Text style={[styles.keyHint, getKeyHintSizeStyles(screenWidth)]}>
+                        {KEY_HINTS[digit]}
+                      </Text>
                     )}
                   </TouchableOpacity>
                 ))}
@@ -367,6 +363,7 @@ export const DialPad: React.FC<DialPadProps> = ({
             ))}
           </View>
 
+          {/* Action buttons row */}
           <View style={styles.actionsRow}>
             <TouchableOpacity
               style={[
@@ -400,8 +397,10 @@ export const DialPad: React.FC<DialPadProps> = ({
               <MaterialIcons name="dialpad" size={22} color="#111827" />
             </TouchableOpacity>
           </View>
+
         </Animated.View>
       </Animated.View>
+
       <LeadDetailsModal
         visible={leadSheetOpen}
         onClose={() => setLeadSheetOpen(false)}
@@ -413,18 +412,20 @@ export const DialPad: React.FC<DialPadProps> = ({
   );
 };
 
-const LeadDetailsModal = ({
-  visible,
-  onClose,
-  leads,
-  activeLead,
-  onSelect,
-}: {
+type LeadDetailsModalProps = {
   visible: boolean;
   onClose: () => void;
   leads: IpkLead[];
   activeLead: IpkLead | null;
   onSelect: (lead: IpkLead) => void;
+};
+
+const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
+  visible,
+  onClose,
+  leads,
+  activeLead,
+  onSelect,
 }) => {
   const activeIndex = Math.max(
     0,
@@ -479,10 +480,7 @@ const LeadDetailsModal = ({
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
             <TouchableOpacity
-              style={[
-                styles.navButton,
-                activeIndex <= 0 && styles.navButtonDisabled,
-              ]}
+              style={[styles.navButton, activeIndex <= 0 && styles.navButtonDisabled]}
               disabled={activeIndex <= 0}
               onPress={() => handleNavigate("prev")}
             >
@@ -495,43 +493,24 @@ const LeadDetailsModal = ({
               </Text>
             </View>
             <TouchableOpacity
-              style={[
-                styles.navButton,
-                activeIndex >= leads.length - 1 && styles.navButtonDisabled,
-              ]}
+              style={[styles.navButton, activeIndex >= leads.length - 1 && styles.navButtonDisabled]}
               disabled={activeIndex >= leads.length - 1}
               onPress={() => handleNavigate("next")}
             >
               <MaterialIcons name="chevron-right" size={20} color="#4C1D95" />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.closeChip}
-            onPress={onClose}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="close" size={16} color="#6B7280" />
-            <Text style={styles.closeChipText}>Close</Text>
-          </TouchableOpacity>
-
-          <ScrollView
-            contentContainerStyle={styles.modalScroll}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
             {activeLead ? (
               <View style={styles.modalDetails}>
-                <Text style={styles.modalSectionTitle}>Model: IpkLeadd</Text>
+                <Text style={styles.modalSectionTitle}>Model: IpkLead</Text>
                 <View style={styles.modalBadge}>
                   <Text style={styles.modalBadgeText}>ipkModule</Text>
                 </View>
                 <InfoRow label="Full Name" value={activeLead.name} />
                 <InfoRow label="Phones" value={phones} />
                 {infoPairs.map((row) => (
-                  <InfoRow
-                    key={row.label}
-                    label={row.label}
-                    value={row.value}
-                  />
+                  <InfoRow key={row.label} label={row.label} value={row.value} />
                 ))}
               </View>
             ) : (
@@ -549,13 +528,12 @@ const LeadDetailsModal = ({
   );
 };
 
-const InfoRow = ({
-  label,
-  value,
-}: {
+type InfoRowProps = {
   label: string;
   value?: string | number | null;
-}) => (
+};
+
+const InfoRow: React.FC<InfoRowProps> = ({ label, value }) => (
   <View style={styles.infoRow}>
     <Text style={styles.infoLabel}>{label}</Text>
     <Text style={styles.infoValue}>{value ?? "—"}</Text>
@@ -569,25 +547,22 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    // Fill full height and space content so keypad/action rows
-    // sit flush at the bottom across devices
     flex: 1,
-    justifyContent: "space-between",
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    justifyContent: "flex-start",
     paddingHorizontal: 22,
-    paddingTop: 12,
-    paddingBottom: 20,
     gap: 12,
   },
-  dragHandle: {
-    width: 48,
-    height: 5,
-    borderRadius: 999,
-    alignSelf: "center",
-    backgroundColor: "#CBD5F5",
-    marginBottom: 4,
+  topFixed: {
+    width: "100%",
   },
+  topContent: {
+  flexGrow: 1,
+  flexShrink: 1,
+  justifyContent: "flex-start",
+  alignItems: "center",
+  marginTop: 100,        // ← Increase this number to move the number section down
+  marginBottom: 14,
+},
   searchField: {
     flexDirection: "row",
     alignItems: "center",
@@ -596,6 +571,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#F3F4F6",
     gap: 10,
+    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
@@ -611,6 +587,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     backgroundColor: "#FFFFFF",
+    marginBottom: 12,
   },
   callAsLabel: {
     fontSize: 13,
@@ -633,11 +610,14 @@ const styles = StyleSheet.create({
   numberDisplay: {
     paddingVertical: 10,
     alignItems: "center",
+    marginTop: 12,
+    marginBottom: 12,
   },
   numberText: {
     fontSize: 32,
     fontWeight: "600",
     letterSpacing: 1,
+    fontFamily: "poppins-bold",
     color: "#111827",
   },
   padGrid: {
@@ -698,7 +678,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  // Lead results styling (replaces suggestion card)
   resultRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -766,6 +745,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#111827",
   },
+  modalSubtitle: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
+  },
   modalScroll: {
     paddingBottom: 20,
     gap: 16,
@@ -799,11 +783,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#6B7280",
     textTransform: "uppercase",
-  },
-  modalSubtitle: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
   },
   modalDetails: {
     padding: 16,
@@ -867,3 +846,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+export default DialPad;

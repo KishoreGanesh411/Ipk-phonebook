@@ -4,7 +4,8 @@ import { StyleSheet } from "react-native";
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const baseKey = 84;
 
-const getKeySize = (w: number) => clamp(Math.floor(w * 0.21), 64, 96);
+// Slightly smaller keypad footprint for a cleaner, more professional feel
+const getKeySize = (w: number) => clamp(Math.floor(w * 0.17), 56, 84);
 
 export const getKeySizeStyles = (w: number) => {
   const size = getKeySize(w);
@@ -12,18 +13,18 @@ export const getKeySizeStyles = (w: number) => {
 };
 
 export const getActionIconSizeStyles = (w: number) => {
-  const size = clamp(Math.round(getKeySize(w) * 0.68), 44, 72);
+  const size = clamp(Math.round(getKeySize(w) * 0.68), 40, 60);
   return { width: size, height: size, borderRadius: size / 2 } as const;
 };
 
 export const getCallButtonSizeStyles = (w: number) => {
-  const size = clamp(Math.round(getKeySize(w) * 1.1), 72, 104);
+  const size = clamp(Math.round(getKeySize(w) * 1.0), 68, 92);
   return { width: size, height: size, borderRadius: size / 2 } as const;
 };
 
 export const getKeyLabelSizeStyles = (w: number) => {
   const ratio = getKeySize(w) / baseKey;
-  const fontSize = clamp(Math.round(28 * ratio), 22, 34);
+  const fontSize = clamp(Math.round(26 * ratio), 20, 30);
   return { fontSize } as const;
 };
 
