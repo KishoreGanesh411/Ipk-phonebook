@@ -86,12 +86,40 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
 
           {!!lead && (
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-              {/* Quick facts */}
+              {/* Overview */}
+              <Card style={[styles.card, styles.summaryCard]}>
+                <Text weight="semibold" style={styles.sectionTitle}>Lead snapshot</Text>
+                <View style={styles.summaryHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text weight="bold" size="lg">{lead.name ?? 'Lead profile'}</Text>
+                    <Text size="sm" tone="muted">{lead.leadCode ?? lead.id}</Text>
+                  </View>
+                  <View style={styles.summaryBadges}>
+                    <SummaryChip icon="flag" label={slugToLabel(lead.clientStage)} />
+                    <SummaryChip icon="verified" label={lead.status} tone="success" />
+                    <SummaryChip icon="campaign" label={lead.leadSource} />
+                  </View>
+                </View>
+
+                <View style={styles.summaryGrid}>
+                  <SummaryItem label="Assigned RM" value={lead.assignedRM || 'Unassigned'} />
+                  <SummaryItem label="Last contact" value={formatDateTime(lead.lastContactedAt)} />
+                  <SummaryItem label="Next follow-up" value={formatDateTime(lead.nextActionDueAt)} />
+                  <SummaryItem label="Referral" value={lead.referralName} />
+                </View>
+              </Card>
+
+              {/* Contact */}
               <Card style={styles.card}>
-                <Text weight="semibold" style={styles.sectionTitle}>Quick info</Text>
-                <View style={styles.row}>
-                  <MaterialIcons name="phone" size={18} color={theme.colors.primary} />
-                  <Text style={styles.rowText}>{primaryPhone || "Not captured"}</Text>
+                <Text weight="semibold" style={styles.sectionTitle}>Contact</Text>
+                <View style={[styles.contactRow, { marginTop: 0 }]}>
+                  <View style={styles.contactIcon}>
+                    <MaterialIcons name="phone" size={18} color={theme.colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text weight="semibold">{primaryPhone || 'Not captured'}</Text>
+                    <Text size="sm" tone="muted">Primary number</Text>
+                  </View>
                   <View style={styles.rowActions}>
                     <Pressable onPress={() => openTel(primaryPhone)} style={styles.iconBtn}>
                       <MaterialIcons name="call" size={18} color="#fff" />
@@ -99,21 +127,32 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                     <Pressable onPress={() => openWhatsApp(primaryPhone)} style={styles.iconBtn}>
                       <MaterialCommunityIcons name="whatsapp" size={18} color="#fff" />
                     </Pressable>
-                    <Pressable onPress={() => copy(primaryPhone)} style={[styles.iconBtn, { backgroundColor: theme.colors.muted }]}>
+                    <Pressable
+                      onPress={() => copy(primaryPhone)}
+                      style={[styles.iconBtn, { backgroundColor: theme.colors.muted }]}
+                    >
                       <MaterialIcons name="content-copy" size={16} color="#fff" />
                     </Pressable>
                   </View>
                 </View>
 
                 {lead.email ? (
-                  <View style={styles.row}>
-                    <MaterialIcons name="email" size={18} color={theme.colors.primary} />
-                    <Text style={styles.rowText}>{lead.email}</Text>
+                  <View style={styles.contactRow}>
+                    <View style={styles.contactIcon}>
+                      <MaterialIcons name="email" size={18} color={theme.colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text weight="semibold">{lead.email}</Text>
+                      <Text size="sm" tone="muted">Email</Text>
+                    </View>
                     <View style={styles.rowActions}>
                       <Pressable onPress={() => openEmail(lead.email)} style={styles.iconBtn}>
                         <MaterialIcons name="send" size={18} color="#fff" />
                       </Pressable>
-                      <Pressable onPress={() => copy(lead.email)} style={[styles.iconBtn, { backgroundColor: theme.colors.muted }]}>
+                      <Pressable
+                        onPress={() => copy(lead.email)}
+                        style={[styles.iconBtn, { backgroundColor: theme.colors.muted }]}
+                      >
                         <MaterialIcons name="content-copy" size={16} color="#fff" />
                       </Pressable>
                     </View>
@@ -121,30 +160,29 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                 ) : null}
 
                 {lead.location ? (
-                  <View style={styles.row}>
-                    <MaterialIcons name="location-on" size={18} color={theme.colors.primary} />
-                    <Text style={styles.rowText}>{lead.location}</Text>
+                  <View style={styles.contactRow}>
+                    <View style={styles.contactIcon}>
+                      <MaterialIcons name="location-on" size={18} color={theme.colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text weight="semibold">{lead.location}</Text>
+                      <Text size="sm" tone="muted">Location</Text>
+                    </View>
                   </View>
                 ) : null}
-              </Card>
-
-              {/* Meta */}
-              <Card style={styles.card}>
-                <Text weight="semibold" style={styles.sectionTitle}>Lead meta</Text>
-                <Meta line1="Lead code" line2={lead.leadCode || "—"} />
-                <Meta line1="Stage" line2={slugToLabel(lead.clientStage)} />
-                <Meta line1="Status" line2={lead.status} />
-                <Meta line1="Lead source" line2={lead.leadSource || "—"} />
-                {lead.referralName ? <Meta line1="Referral" line2={lead.referralName} /> : null}
-                {lead.nextActionDueAt ? <Meta line1="Next follow-up" line2={new Date(lead.nextActionDueAt).toLocaleString()} /> : null}
               </Card>
 
               {/* Product/Investment */}
               <Card style={styles.card}>
                 <Text weight="semibold" style={styles.sectionTitle}>Product & Investment</Text>
-                <Meta line1="Product" line2={lead.product || "Not specified"} />
-                <Meta line1="Investment range" line2={lead.investmentRange || "Not captured"} />
-                {typeof lead.sipAmount === "number" ? <Meta line1="SIP (₹/mo)" line2={String(lead.sipAmount)} /> : null}
+                <DetailRow label="Product" value={lead.product || "Not specified"} />
+                <DetailRow
+                  label="Investment range"
+                  value={lead.investmentRange || "Not captured"}
+                />
+                {typeof lead.sipAmount === "number" ? (
+                  <DetailRow label="SIP (₹/mo)" value={`₹${lead.sipAmount.toLocaleString()}`} />
+                ) : null}
               </Card>
 
               {/* Remarks / Bio */}
@@ -173,23 +211,23 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
               {!!lead.accountApps?.length && (
                 <Card style={styles.card}>
                   <Text weight="semibold" style={styles.sectionTitle}>Account application</Text>
-                  {lead.accountApps.map((a: any) => (
-                    <Meta
-                      key={a.id}
-                      line1={`${a.applicationStatus} / KYC ${a.kycStatus}`}
-                      line2={
-                        a.approvedAt
-                          ? `Approved ${new Date(a.approvedAt).toLocaleDateString()}`
-                          : a.declinedAt
-                          ? `Declined ${new Date(a.declinedAt).toLocaleDateString()}`
-                          : a.reviewedAt
-                          ? `Reviewed ${new Date(a.reviewedAt).toLocaleDateString()}`
-                          : a.submittedAt
-                          ? `Submitted ${new Date(a.submittedAt).toLocaleDateString()}`
-                          : "—"
-                      }
-                    />
-                  ))}
+                  {lead.accountApps.map((a: any) => {
+                    const statusLabel = `${a.applicationStatus} / KYC ${a.kycStatus}`;
+                    const timeline =
+                      formatDateTime(a.approvedAt) ||
+                      formatDateTime(a.declinedAt) ||
+                      formatDateTime(a.reviewedAt) ||
+                      formatDateTime(a.submittedAt) ||
+                      '—';
+                    return (
+                      <View key={a.id} style={styles.applicationRow}>
+                        <Text weight="semibold">{statusLabel}</Text>
+                        <Text size="sm" tone="muted" style={{ marginTop: 2 }}>
+                          {timeline}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </Card>
               )}
 
@@ -204,7 +242,7 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                         <Text weight="semibold">{prettyType(ev.type)}</Text>
                         {ev.text ? <Text style={{ marginTop: 2 }} tone="muted">{ev.text}</Text> : null}
                         <Text size="sm" tone="muted" style={{ marginTop: 2 }}>
-                          {new Date(ev.occurredAt).toLocaleString()}
+                          {formatDateTime(ev.occurredAt) ?? '—'}
                         </Text>
                       </View>
                     </View>
@@ -242,11 +280,65 @@ function prettyType(t: string) {
   return slugToLabel(t);
 }
 
-function Meta({ line1, line2 }: { line1: string; line2: string }) {
+const formatDateTime = (input?: string | null) => {
+  if (!input) return undefined;
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+};
+
+function SummaryItem({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
   return (
-    <View style={{ marginTop: 8 }}>
-      <Text size="sm" tone="muted">{line1}</Text>
-      <Text>{line2}</Text>
+    <View style={{ width: '48%', flexBasis: '48%', flexGrow: 1 }}>
+      <Text
+        size="sm"
+        tone="muted"
+        style={{ textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 11 }}
+      >
+        {label}
+      </Text>
+      <Text weight="semibold" style={{ marginTop: 4 }}>{value}</Text>
+    </View>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <View style={{ marginTop: 10 }}>
+      <Text size="sm" tone="muted">{label}</Text>
+      <Text style={{ marginTop: 2 }}>{value}</Text>
+    </View>
+  );
+}
+
+function SummaryChip({
+  icon,
+  label,
+  tone = 'default',
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  label?: string | null;
+  tone?: 'default' | 'success';
+}) {
+  const theme = useTheme();
+  if (!label) return null;
+  const background =
+    tone === 'success' ? 'rgba(34,197,94,0.16)' : 'rgba(79,70,229,0.12)';
+  const color = tone === 'success' ? '#15803D' : theme.colors.primary;
+  return (
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: background,
+    }}>
+      <MaterialIcons name={icon} size={16} color={color} />
+      <Text style={{ color, fontWeight: '600', fontSize: 12 }}>{label}</Text>
     </View>
   );
 }
@@ -281,17 +373,54 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) =>
       padding: theme.spacing.lg,
       gap: theme.spacing.md,
     },
-    card: { padding: theme.spacing.md },
-    sectionTitle: { marginBottom: 6 },
-    row: {
-      flexDirection: "row", alignItems: "center",
-      marginTop: 8, gap: 10,
+    card: { padding: theme.spacing.md, borderRadius: 16 },
+    sectionTitle: { marginBottom: 12 },
+    summaryCard: {
+      backgroundColor: theme.scheme === 'dark' ? '#0F172A' : '#F8FAFF',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
     },
-    rowText: { flex: 1 },
-    rowActions: { flexDirection: "row", gap: 8 },
+    summaryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      marginBottom: 16,
+    },
+    summaryBadges: {
+      gap: 8,
+      alignItems: 'flex-end',
+    },
+    summaryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    contactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 12,
+    },
+    contactIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(79,70,229,0.12)',
+    },
+    rowActions: { flexDirection: 'row', gap: 8 },
     iconBtn: {
       backgroundColor: theme.colors.primary,
-      paddingHorizontal: 10, paddingVertical: 8, borderRadius: 14,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 14,
+    },
+    applicationRow: {
+      marginTop: 10,
+      paddingVertical: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
     },
     timelineItem: {
       flexDirection: "row", gap: 12, marginTop: 10,

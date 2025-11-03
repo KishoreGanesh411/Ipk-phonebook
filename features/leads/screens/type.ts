@@ -18,4 +18,10 @@ export type LeadItem = {
   leadSource?: string | null;
   assignedRM?: string | null;
   assignedRmId?: string | null;
+  leadCode?: string | null;
+  nextActionDueAt?: string | null;
+  lastContactedAt?: string | null;
+  investmentRange?: string | null;
+  sipAmount?: number | null;
+  product?: string | null;
 };

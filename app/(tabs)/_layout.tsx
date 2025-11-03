@@ -11,6 +11,7 @@ import { useCallStore } from "@/features/phone/store/call.store";
 import { Text } from "@/components/ui/Text";
 import { formatPhone } from "@/core/utils/format";
 import { ipkLeadPipeline } from "@/features/leads/data/ipkLeadModel";
+import type { ActiveLeadSnapshot } from "@/features/phone/store/call.store";
 
 export default function TabsLayout() {
   const theme = useTheme();
@@ -28,12 +29,26 @@ export default function TabsLayout() {
     value.replace(/[\s\-\(\)]/g, "");
   const matchedLead = useMemo(() => {
     if (!activeCall) return null;
+    const explicit = activeCall.lead;
+    if (explicit) return explicit;
     const normalized = activeCall.normalized;
-    return (
+    const fallback =
       ipkLeadPipeline.find(
         (lead) => normalizeNumber(lead.phone) === normalized
-      ) ?? null
-    );
+      ) ?? null;
+    if (!fallback) return null;
+    return {
+      id: fallback.id,
+      name: fallback.name,
+      phone: fallback.phone,
+      clientStage: fallback.pipelineStage,
+      status: fallback.status,
+      leadSource: fallback.leadSource,
+      leadCode: fallback.leadCode,
+      assignedRM: fallback.assignedRM,
+      lastContactedAt: fallback.lastContactedAt,
+      nextActionDueAt: fallback.nextActionDueAt,
+    } satisfies ActiveLeadSnapshot;
   }, [activeCall]);
 
   const handleCall = (num: string) => {
@@ -42,7 +57,30 @@ export default function TabsLayout() {
       toast("Enter a number");
       return;
     }
-    startCall(num);
+
+    const normalized = normalizeNumber(num);
+    const leadMatch =
+      ipkLeadPipeline.find(
+        (lead) => normalizeNumber(lead.phone) === normalized
+      ) ?? null;
+
+    const snapshot: ActiveLeadSnapshot | null = leadMatch
+      ? {
+          id: leadMatch.id,
+          name: leadMatch.name,
+          phone: leadMatch.phone,
+          clientStage: leadMatch.pipelineStage,
+          status: leadMatch.status,
+          leadSource: leadMatch.leadSource,
+          leadCode: leadMatch.leadCode,
+          assignedRM: leadMatch.assignedRM,
+          assignedRmId: leadMatch.assignedRmId,
+          lastContactedAt: leadMatch.lastContactedAt,
+          nextActionDueAt: leadMatch.nextActionDueAt,
+        }
+      : null;
+
+    startCall(num, snapshot);
     setDialOpen(false);
   };
 
@@ -174,12 +212,50 @@ export default function TabsLayout() {
             <Text style={styles.overlayName}>
               {matchedLead?.name ?? formatPhone(activeCall.dialed)}
             </Text>
-            {!!matchedLead?.companyName && (
-              <Text style={styles.overlayCompany}>{matchedLead.companyName}</Text>
+            {!!matchedLead?.leadSource && (
+              <Text style={styles.overlayCompany}>{matchedLead.leadSource}</Text>
             )}
             <Text style={styles.overlayNumber}>
               {formatPhone(activeCall.dialed)}
             </Text>
+            {matchedLead?.clientStage && (
+              <View style={styles.stageBadge}>
+                <Text style={styles.stageBadgeText}>
+                  {matchedLead.clientStage
+                    .split("_")
+                    .map((chunk) =>
+                      chunk.charAt(0) + chunk.slice(1).toLowerCase()
+                    )
+                    .join(" ")}
+                </Text>
+              </View>
+            )}
+            {(matchedLead?.assignedRM || matchedLead?.leadCode) && (
+              <View style={styles.overlayMetaRow}>
+                {matchedLead?.assignedRM ? (
+                  <View style={styles.overlayMetaChip}>
+                    <MaterialIcons name="person" size={16} color="#C7D2FE" />
+                    <Text style={styles.overlayMetaText}>
+                      {matchedLead.assignedRM}
+                    </Text>
+                  </View>
+                ) : null}
+                {matchedLead?.leadCode ? (
+                  <View style={styles.overlayMetaChip}>
+                    <MaterialIcons name="tag" size={16} color="#C7D2FE" />
+                    <Text style={styles.overlayMetaText}>{matchedLead.leadCode}</Text>
+                  </View>
+                ) : null}
+                {matchedLead?.selectedSim ? (
+                  <View style={styles.overlayMetaChip}>
+                    <MaterialIcons name="sim-card" size={16} color="#C7D2FE" />
+                    <Text style={styles.overlayMetaText}>
+                      {matchedLead.selectedSim}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
 
             <View style={styles.overlayActionsRow}>
               <CallActionButton
@@ -235,11 +311,16 @@ export default function TabsLayout() {
         <View style={styles.callBanner}>
           <View>
             <Text size="sm" tone="muted">
-              Calling
+              {matchedLead?.name ? "Calling lead" : "Calling"}
             </Text>
             <Text weight="bold" size="lg">
               {formatPhone(activeCall.dialed)}
             </Text>
+            {matchedLead?.name ? (
+              <Text size="sm" tone="muted">
+                {matchedLead.name}
+              </Text>
+            ) : null}
           </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Pressable
@@ -384,6 +465,41 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#94A3B8",
     fontSize: 14,
+  },
+  stageBadge: {
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(99,102,241,0.18)",
+  },
+  stageBadgeText: {
+    color: "#C7D2FE",
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  overlayMetaRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+  },
+  overlayMetaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(30,64,175,0.35)",
+    gap: 6,
+  },
+  overlayMetaText: {
+    color: "#E0E7FF",
+    fontSize: 12,
+    fontWeight: "600",
   },
   overlayActionsRow: {
     marginTop: 24,
