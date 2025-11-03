@@ -37,6 +37,12 @@ export const LEADS_BY_STAGE_QUERY = gql`
         assignedRM
         assignedRmId
         status
+        leadCode
+        nextActionDueAt
+        lastContactedAt
+        investmentRange
+        sipAmount
+        product
       }
     }
   }
@@ -53,6 +59,9 @@ export const LEAD_DETAIL_WITH_TIMELINE = gql`
       firstName
       lastName
       phone
+      assignedRM
+      assignedRmId
+      lastContactedAt
       phones { id number normalized isPrimary isWhatsapp label }
       email
       location
