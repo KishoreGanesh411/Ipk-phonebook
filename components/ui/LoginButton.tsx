@@ -10,6 +10,7 @@ type Props = {
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
+  loadingText?: string;
 };
 
 export const LoginButton: React.FC<Props> = ({
@@ -18,6 +19,7 @@ export const LoginButton: React.FC<Props> = ({
   loading,
   disabled,
   style,
+  loadingText,
 }) => {
   const theme = useTheme();
   const styles = makeStyles(theme);
@@ -26,6 +28,7 @@ export const LoginButton: React.FC<Props> = ({
       label={label}
       onPress={onPress}
       loading={loading}
+      loadingText={loadingText}
       disabled={disabled}
       style={[styles.base, style]}
       textStyle={styles.text}

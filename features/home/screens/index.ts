@@ -1,1 +1,2 @@
-export * from "./HomeDashboardScreen.v2";
+export * from "./HomeDashboardScreen";
+

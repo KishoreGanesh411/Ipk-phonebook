@@ -33,6 +33,7 @@ export const SignInScreen = () => {
   const { signIn, signingIn, error, hydrateUserFromGraphQL } = useAuthStore();
   const [email, setEmail] = useState(DEMO_EMAIL);
   const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [fetchingAfterLogin, setFetchingAfterLogin] = useState(false);
 
   const handleSubmit = async () => {
     Keyboard.dismiss();
@@ -46,12 +47,15 @@ export const SignInScreen = () => {
         toast("Incorrect email or password");
         return;
       }
+      setFetchingAfterLogin(true);
       await hydrateUserFromGraphQL();
       toast("Signed in successfully");
       router.replace("/(tabs)");
     } catch (err) {
       console.error("SignIn error:", err);
       toast("Something went wrong");
+    } finally {
+      setFetchingAfterLogin(false);
     }
   };
 
@@ -104,7 +108,8 @@ export const SignInScreen = () => {
             <LoginButton
               label="Login"
               onPress={handleSubmit}
-              loading={signingIn}
+              loading={signingIn || fetchingAfterLogin}
+              loadingText="Please wait…"
               style={styles.cta}
             />
 

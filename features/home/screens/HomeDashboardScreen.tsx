@@ -1,118 +1,182 @@
-﻿import { ComponentProps, useMemo, useRef, useState } from "react";
+// HomeDashboardScreen.tsx
+import { useQuery } from "@apollo/client/react";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { ComponentProps, useMemo, useState } from "react";
 import {
+  Linking,
+  Pressable,
   ScrollView,
   StyleSheet,
-  View,
-  Pressable,
   useWindowDimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-  Modal,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialIcons } from "@expo/vector-icons";
 
+import { LoadingState } from "@/components/feedback/LoadingState";
 import { Card } from "@/components/ui/Card";
 import { Text } from "@/components/ui/Text";
+import { MY_ASSIGNED_LEADS } from "@/core/graphql/queries";
 import { useTheme } from "@/core/theme/ThemeProvider";
 import { humanizeEnum } from "@/core/utils/format";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import {
-  leadCatalogue,
-  leadCategories,
-  type Lead,
-  type LeadCategory
-} from "@/features/home/data/leadData";
-import { ProfileModal } from "@/features/home/components";
+import LeadDetailSheet from "@/features/leads/screens/LeadDetailSheet";
+import { useCallStore } from "@/features/phone/store/call.store";
 
-const quickActions: Array<{
+const quickActions: {
   id: string;
   label: string;
   description: string;
   icon: ComponentProps<typeof MaterialIcons>["name"];
-}> = [
-  { id: "all-leads", label: "All Leads", description: "View every active relationship", icon: "group" },
-  { id: "chat", label: "Chat", description: "Pick up conversations instantly", icon: "chat-bubble-outline" },
-  { id: "tasks", label: "Tasks", description: "Stay on top of daily follow-ups", icon: "check-circle-outline" }
+}[] = [
+  {
+    id: "all-leads",
+    label: "All Leads",
+    description: "View every active relationship",
+    icon: "group",
+  },
+  {
+    id: "today-followups",
+    label: "Today's Follow-ups",
+    description: "Calls and tasks due today",
+    icon: "today",
+  },
 ];
+
+function getInitials(name: string) {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.charAt(0) ?? "";
+  const last =
+    parts.length > 1 ? (parts[parts.length - 1]?.charAt(0) ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+type LeadLite = {
+  id: string;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  clientStage?: string | null;
+  createdAt?: string | null;
+};
 
 export const HomeDashboardScreen = () => {
   const theme = useTheme();
   const styles = makeStyles(theme);
   const { width } = useWindowDimensions();
-  const horizontalPagerRef = useRef<ScrollView>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [profileVisible, setProfileVisible] = useState(false);
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore((s) => s.user);
+  const startCall = useCallStore((s) => s.startCall);
+  const router = useRouter();
 
   const displayName = user?.name ?? "IPK Wealth";
   const initials = useMemo(() => getInitials(displayName), [displayName]);
-
   const pageWidth = Math.max(width - theme.spacing.lg * 2, 280);
 
-  const badgePalette = useMemo(
-    () => ({
-      primary: { backgroundColor: "rgba(70, 95, 255, 0.12)", color: theme.colors.primary },
-      success: { backgroundColor: "rgba(18, 183, 106, 0.12)", color: theme.colors.success },
-      error: { backgroundColor: "rgba(240, 68, 56, 0.12)", color: theme.colors.error },
-      muted: { backgroundColor: "rgba(102, 112, 133, 0.12)", color: theme.colors.muted }
-    }),
-    [theme.colors]
-  );
+  // GraphQL query
+  const { data, loading, error } = useQuery(MY_ASSIGNED_LEADS, {
+    variables: { page: 1, pageSize: 100 },
+    fetchPolicy: "cache-and-network",
+    notifyOnNetworkStatusChange: true,
+  });
 
-  const handleTabPress = (index: number) => {
-    setActiveIndex(index);
-    horizontalPagerRef.current?.scrollTo({ x: index * pageWidth, animated: true });
+  const groupedByStage = useMemo(() => {
+    const items: LeadLite[] = (data as any)?.myAssignedLeads?.items ?? [];
+    const map = new Map<string, LeadLite[]>();
+    for (const it of items) {
+      const key = String(it?.clientStage ?? "NEW_LEAD");
+      const arr = map.get(key) ?? [];
+      arr.push(it);
+      map.set(key, arr);
+    }
+    return map;
+  }, [data]);
+
+  const stageOrder = [
+    "NEW_LEAD",
+    "FIRST_TALK_DONE",
+    "FOLLOWING_UP",
+    "CLIENT_INTERESTED",
+    "ACCOUNT_OPENED",
+    "NO_RESPONSE_DORMANT",
+    "NOT_INTERESTED_DORMANT",
+    "RISKY_CLIENT_DORMANT",
+    "HIBERNATED",
+  ];
+
+  const [selectedStage, setSelectedStage] = useState<string>("NEW_LEAD");
+
+  const agingDays = (iso?: string | null) => {
+    if (!iso) return undefined;
+    const days = Math.floor(
+      (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return Math.max(0, days);
   };
 
-  const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
-    if (nextIndex !== activeIndex) {
-      setActiveIndex(nextIndex);
-    }
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  
+  const openLead = (id: string) => {
+    setDetailId(id);
+    setSheetVisible(true);
+  };
+
+  const placeCall = async (phone?: string | null) => {
+    if (!phone) return;
+    startCall(phone);
+    const normalized = String(phone).replace(/\s|[-()]/g, "");
+    const url = `tel:${normalized}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) await Linking.openURL(url);
+    } catch {}
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
         <View style={styles.headerRow}>
-          <View style={styles.avatar}>
-            <Text weight="semibold" tone="default">
-              {initials}
-            </Text>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/profile')}
+            style={styles.avatar}
+          >
+            <Text weight="semibold" tone="default">{initials}</Text>
+          </Pressable>
           <View style={styles.headerCopy}>
-            <Text size="sm" tone="muted">
-              Welcome back
-            </Text>
-            <Text size="lg" weight="semibold">
-              {displayName}
-            </Text>
+            <Text size="sm" tone="muted">Welcome back</Text>
+            <Text size="lg" weight="semibold">{displayName}</Text>
           </View>
           <View style={styles.headerIcons}>
             <Pressable
-              style={styles.smallAvatar}
-              onPress={() => setProfileVisible(true)}
               accessibilityRole="button"
+              onPress={() => router.push('/profile')}
+              style={styles.smallAvatar}
             >
-              <MaterialIcons name="person-outline" size={18} color={theme.colors.primary} />
-            </Pressable>
-            <View style={styles.smallAvatar}>
               <MaterialIcons name="verified-user" size={18} color={theme.colors.primary} />
-            </View>
+            </Pressable>
           </View>
         </View>
 
+        {/* Quick actions */}
         <Card style={styles.quickCard}>
           <Text size="md" weight="semibold" style={styles.quickTitle}>
             Workspace shortcuts
           </Text>
           <View style={styles.quickActions}>
             {quickActions.map((action) => (
-              <Pressable key={action.id} style={styles.quickAction}>
+              <View key={action.id} style={styles.quickAction}>
                 <View style={styles.quickIcon}>
-                  <MaterialIcons name={action.icon} size={22} color={theme.colors.primary} />
+                  <MaterialIcons
+                    name={action.icon}
+                    size={22}
+                    color={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.quickContent}>
                   <Text weight="semibold">{action.label}</Text>
@@ -120,445 +184,199 @@ export const HomeDashboardScreen = () => {
                     {action.description}
                   </Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={20} color={theme.colors.muted} />
-              </Pressable>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={20}
+                  color={theme.colors.muted}
+                />
+              </View>
             ))}
           </View>
         </Card>
 
-        <View style={styles.pipelineHeader}>
-          <Text size="lg" weight="bold">
-            Lead pipeline
-          </Text>
-          <Text tone="muted" size="sm">
-            Swipe through key segments and follow up faster.
-          </Text>
-        </View>
-
-        {/* Category selector button */}
-        <Pressable
-          onPress={() => setPickerOpen(true)}
-          style={styles.selectorButton}
-          accessibilityRole="button"
+        {/* Stage filter */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: theme.spacing.lg,
+            gap: 8,
+          }}
         >
-          <Text weight="semibold" style={{ flex: 1 }}>
-            {humanizeEnum(leadCategories[activeIndex] as string)}
-          </Text>
-          <View
-            style={[
-              styles.countCircle,
-              {
-                borderColor: theme.colors.success,
-                backgroundColor: theme.scheme === "dark" ? "rgba(16,185,129,0.15)" : "transparent",
-              },
-            ]}
-          >
-            <Text weight="bold" style={styles.countCircleText}>
-              {leadCatalogue[leadCategories[activeIndex]].length}
-            </Text>
-          </View>
-          <MaterialIcons name="expand-more" size={22} color={theme.colors.muted} />
-        </Pressable>
-
-        {/* Quick access chips for Pending/Missed Calls */}
-        <View style={styles.quickStatusRow}>
-          {(() => {
-            const label = "Pending Calls" as const;
-            const index = leadCategories.indexOf(label);
-            const count = index >= 0 ? (leadCatalogue[label]?.length ?? 0) : 0;
-            if (index < 0) return null;
-            return (
-              <Pressable
-                key={label}
-                onPress={() => handleTabPress(index)}
-                style={[styles.quickChip, styles.quickChipPending, theme.scheme === "dark" && { backgroundColor: "#0C111D" }]}
+          {stageOrder.map((s) => (
+            <Pressable
+              key={s}
+              onPress={() => setSelectedStage(s)}
+              style={[
+                {
+                  borderRadius: 18,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.card,
+                },
+                selectedStage === s && {
+                  borderColor: theme.colors.primary,
+                  backgroundColor: "rgba(70,95,255,0.08)",
+                },
+              ]}
+            >
+              <Text
+                size="sm"
+                weight={selectedStage === s ? "semibold" : "medium"}
               >
-                <Text weight="medium" style={{ flex: 1 }}>Pending Calls</Text>
-                <View
-                  style={[
-                    styles.countCircle,
-                    {
-                      borderColor: theme.colors.primary,
-                      backgroundColor: theme.scheme === "dark" ? "rgba(59,130,246,0.15)" : "transparent",
-                    },
-                  ]}
-                >
-                  <Text weight="bold" style={styles.countCircleText}>{count}</Text>
-                </View>
-              </Pressable>
-            );
-          })()}
-          {(() => {
-            const label = "Missed Calls" as const;
-            const index = leadCategories.indexOf(label);
-            const count = index >= 0 ? (leadCatalogue[label]?.length ?? 0) : 0;
-            if (index < 0) return null;
-            return (
-              <Pressable
-                key={label}
-                onPress={() => handleTabPress(index)}
-                style={[styles.quickChip, styles.quickChipMissed, theme.scheme === "dark" && { backgroundColor: "#0C111D" }]}
-              >
-                <Text weight="medium" style={{ flex: 1 }}>Missed Calls</Text>
-                <View
-                  style={[
-                    styles.countCircle,
-                    {
-                      borderColor: theme.colors.error,
-                      backgroundColor: theme.scheme === "dark" ? "rgba(239,68,68,0.15)" : "transparent",
-                    },
-                  ]}
-                >
-                  <Text weight="bold" style={styles.countCircleText}>{count}</Text>
-                </View>
-              </Pressable>
-            );
-          })()}
-        </View>
+                {humanizeEnum(s)}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
-        {/* Category picker modal */}
-        <Modal
-          visible={pickerOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPickerOpen(false)}
-        >
-          <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)} />
-          <View style={styles.modalSheet}>
-            <Text size="md" weight="semibold" style={{ marginBottom: 8 }}>
-              Select pipeline
+        {/* Stage wise lead list */}
+        <View style={{ paddingHorizontal: theme.spacing.lg, marginTop: theme.spacing.md }}>
+          {loading && (!groupedByStage.get(selectedStage) || groupedByStage.get(selectedStage)?.length === 0) && (
+            <LoadingState message="Retrieving your data…" />
+          )}
+
+          {error && (
+            <Text tone="error" style={{ textAlign: "center", marginTop: theme.spacing.md }}>
+              Oops! Something went wrong.
             </Text>
-            <ScrollView style={{ maxHeight: 360 }}>
-              {leadCategories.map((category, index) => {
-                if (category === "Pending Calls" || category === "Missed Calls") {
-                  // These are shown as quick chips below; skip in selector list
-                  return null;
-                }
-                const isActive = index === activeIndex;
-                const count = leadCatalogue[category]?.length ?? 0;
-                return (
-                  <Pressable
-                    key={category}
-                    onPress={() => {
-                      setPickerOpen(false);
-                      handleTabPress(index);
-                    }}
-                    style={[styles.optionRow, isActive && styles.optionRowActive]}
-                  >
-                    <Text weight={isActive ? "semibold" : "medium"}>
-                      {humanizeEnum(category as string)}
-                    </Text>
-                    <View
-                      style={[
-                        styles.countCircle,
-                        {
-                          borderColor: theme.colors.success,
-                          backgroundColor: theme.scheme === "dark" ? "rgba(16,185,129,0.15)" : "transparent",
-                        },
-                      ]}
-                    >
-                      <Text weight="bold" style={styles.countCircleText}>{count}</Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </Modal>
+          )}
 
-        <View style={styles.carouselWrapper}>
-          <ScrollView
-            ref={horizontalPagerRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={[styles.carousel, { width: pageWidth }]}
-            contentContainerStyle={styles.carouselContent}
-            onMomentumScrollEnd={handleMomentumEnd}
-            scrollEventThrottle={16}
-          >
-            {leadCategories.map((category: LeadCategory) => (
-              <View key={category} style={[styles.carouselPage, { width: pageWidth }]}> 
-                <Text tone="muted" size="sm" style={styles.pageCaption}>
-                  {leadCatalogue[category].length} records - {category}
+          {(() => {
+            const leads = groupedByStage.get(selectedStage) ?? [];
+            if (!leads.length) {
+              return (
+                <Text tone="muted" style={{ textAlign: "center", marginTop: theme.spacing.md }}>
+                  No leads in this stage.
                 </Text>
-                {leadCatalogue[category].map((lead: Lead) => {
-                  const palette = badgePalette[lead.tone];
-                  return (
-                    <Card key={lead.id} style={styles.leadCard}>
-                      <View style={styles.leadRow}>
-                        <View style={styles.leadAvatar}>
-                          <MaterialIcons name="person" size={24} color={theme.colors.primary} />
-                        </View>
-                        <View style={styles.leadDetails}>
-                          <Text weight="semibold">{lead.name}</Text>
-                          <Text tone="muted" size="sm">
-                            {lead.phone}
+              );
+            }
+            return (
+              <Card style={{ marginBottom: theme.spacing.md, padding: theme.spacing.md }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text weight="semibold">{humanizeEnum(selectedStage)}</Text>
+                  <Text tone="muted" size="sm">{leads.length}</Text>
+                </View>
+                <View style={{ marginTop: 8, gap: 8 }}>
+                  {leads.map((lead) => (
+                    <Pressable
+                      key={lead.id}
+                      onPress={() => openLead(lead.id)}
+                      style={{ paddingVertical: 8 }}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                        <View style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: "rgba(70,95,255,0.15)",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}>
+                          <Text weight="bold" style={{ color: theme.colors.primary }}>
+                            {String(lead.name || "L").charAt(0)}
                           </Text>
-                          {lead.company ? (
-                            <Text tone="muted" size="sm">
-                              {lead.company}
-                            </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text weight="semibold">{lead.name ?? "Unnamed"}</Text>
+                          <Text size="sm" tone="muted">{lead.phone ?? ""}</Text>
+                          {lead.email ? (
+                            <Text size="sm" tone="muted">{lead.email}</Text>
                           ) : null}
                         </View>
-                        <View
-                          style={[styles.badge, { backgroundColor: palette.backgroundColor }]}
-                        >
-                          <Text size="sm" weight="medium" style={[styles.badgeText, { color: palette.color }]}>
-                            {lead.status}
-                          </Text>
+                        <View style={{ alignItems: "flex-end" }}>
+                          <Text size="sm" tone="muted">{agingDays(lead.createdAt)}d</Text>
+                          <Pressable
+                            onPress={() => placeCall(lead.phone)}
+                            style={{
+                              marginTop: 6,
+                              backgroundColor: theme.colors.success,
+                              borderRadius: 16,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                            }}
+                          >
+                            <Text size="sm" weight="bold" style={{ color: "#fff" }}>
+                              Call
+                            </Text>
+                          </Pressable>
                         </View>
                       </View>
-                    </Card>
-                  );
-                })}
-              </View>
-            ))}
-          </ScrollView>
+                    </Pressable>
+                  ))}
+                </View>
+              </Card>
+            );
+          })()}
         </View>
-      </ScrollView>
-      <ProfileModal
-        visible={profileVisible}
-        onClose={() => setProfileVisible(false)}
-        user={user}
-      />
-    </SafeAreaView>
-  );
-};
 
-const getInitials = (value: string) => {
-  const initials = value
-    .split(" ")
-    .map((part) => part.trim()[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  return initials || "IP";
-};
+                {/* Lead detail sheet */}
+                <LeadDetailSheet
+                  leadId={detailId}
+                  visible={sheetVisible}
+                  onClose={() => setSheetVisible(false)}
+                />
+              </ScrollView>
+            </SafeAreaView>
+          );
+        };
 
 const makeStyles = (theme: ReturnType<typeof useTheme>) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background
-    },
-    scrollContent: {
-      padding: theme.spacing.lg,
-      gap: theme.spacing.lg,
-      paddingBottom: theme.spacing.xl * 1.5
-    },
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    scrollContent: { paddingVertical: theme.spacing.lg, gap: theme.spacing.md },
     headerRow: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between"
+      justifyContent: "space-between",
+      paddingHorizontal: theme.spacing.lg,
+    },
+    headerCopy: { flex: 1, marginLeft: theme.spacing.md },
+    headerIcons: { flexDirection: "row", gap: theme.spacing.sm },
+    smallAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     avatar: {
-      height: 56,
-      width: 56,
-      borderRadius: 28,
-      backgroundColor: "rgba(70, 95, 255, 0.15)",
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    headerCopy: {
-      flex: 1,
-      marginLeft: theme.spacing.md,
-      gap: 4
-    },
-    headerIcons: {
-      flexDirection: "row",
-      gap: theme.spacing.xs
-    },
-    smallAvatar: {
-      height: 36,
-      width: 36,
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.card
+      backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     quickCard: {
-      gap: theme.spacing.md
-    },
-    quickTitle: {
-      textTransform: "uppercase",
-      letterSpacing: 0.6
-    },
-    quickActions: {
-      gap: theme.spacing.sm
-    },
-    quickAction: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing.md
-    },
-    quickIcon: {
-      height: 44,
-      width: 44,
-      borderRadius: 22,
-      backgroundColor: "rgba(70, 95, 255, 0.1)",
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    quickContent: {
-      flex: 1,
-      gap: 2
-    },
-    pipelineHeader: {
-      gap: 4
-    },
-    pillRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: theme.spacing.sm,
-      justifyContent: "center"
-    },
-    pillRowHorizontal: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing.sm,
-      paddingHorizontal: 2,
-    },
-    selectorButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.sm,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.radii.lg,
-      gap: theme.spacing.sm,
-    },
-    modalBackdrop: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(0,0,0,0.45)",
-    },
-    modalSheet: {
-      position: "absolute",
-      left: theme.spacing.lg,
-      right: theme.spacing.lg,
-      top: "20%",
-      borderRadius: theme.radii.lg,
+      marginHorizontal: theme.spacing.lg,
       padding: theme.spacing.md,
-      backgroundColor: theme.colors.card,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
     },
-    optionRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingVertical: 10,
-      paddingHorizontal: 6,
-      borderRadius: 10,
-    },
-    optionRowActive: {
-      backgroundColor: "rgba(70,95,255,0.08)",
-    },
-    countBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 999,
-      backgroundColor: "rgba(70,95,255,0.12)",
-    },
-    countCircle: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      borderWidth: 2,
+    quickTitle: { marginBottom: theme.spacing.sm },
+    quickActions: { flexDirection: "column", gap: 8 },
+    quickAction: { flexDirection: "row", alignItems: "center", gap: 12 },
+    quickIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "transparent",
-      marginRight: theme.spacing.xs,
+      backgroundColor: "rgba(70,95,255,0.12)",
     },
-    countCircleText: {
-      color: theme.scheme === "dark" ? "#E5E7EB" : "#0F172A",
-      fontSize: 12,
-    },
-    quickStatusRow: {
-      flexDirection: "row",
-      gap: theme.spacing.sm,
-    },
-    quickChip: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.sm,
-      borderWidth: 1,
-      borderRadius: theme.radii.lg,
-      backgroundColor: theme.colors.card,
-      gap: theme.spacing.sm,
-    },
-    quickChipPending: {
-      borderColor: theme.colors.primary,
-    },
-    quickChipMissed: {
-      borderColor: theme.colors.error,
-    },
-    pill: {
-      borderRadius: 999,
-      paddingVertical: theme.spacing.xs,
-      paddingHorizontal: theme.spacing.md,
-      backgroundColor: theme.colors.card,
-      borderWidth: 1,
-      borderColor: theme.colors.border
-    },
-    pillActive: {
-      borderColor: theme.colors.primary,
-      backgroundColor: "rgba(70, 95, 255, 0.1)"
-    },
-    carouselWrapper: {
-      alignItems: "center"
-    },
-    carousel: {
-      borderRadius: theme.radii.lg
-    },
-    carouselContent: {
-      alignItems: "stretch"
-    },
-    carouselPage: {
-      gap: theme.spacing.sm
-    },
-    pageCaption: {
-      textAlign: "center"
-    },
-    leadCard: {
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.md
-    },
-    leadRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing.md
-    },
-    leadAvatar: {
-      height: 48,
-      width: 48,
-      borderRadius: 24,
-      backgroundColor: theme.colors.card,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    leadDetails: {
-      flex: 1,
-      gap: 2
-    },
-    badge: {
-      paddingVertical: 4,
-      paddingHorizontal: theme.spacing.sm,
-      borderRadius: 999
-    },
-    badgeText: {
-      textTransform: "capitalize"
-    }
+    quickContent: { flex: 1 },
   });
+
+export default HomeDashboardScreen;
+
+
+
 
 
 

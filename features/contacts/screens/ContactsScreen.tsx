@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { useTheme } from "@/core/theme/ThemeProvider";
 import { useContacts } from "@/features/contacts/hooks/useContacts";
@@ -6,6 +6,7 @@ import { ContactList } from "@/features/contacts/components/ContactList";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
+import { LoadingState } from "@/components/feedback/LoadingState";
 
 export const ContactsScreen = () => {
   const theme = useTheme();
@@ -14,9 +15,8 @@ export const ContactsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={theme.colors.primary} />
-        <Text tone="muted">Syncing CRM contacts...</Text>
+      <View style={[styles.center, { backgroundColor: theme.colors.background }]}>
+        <LoadingState message="Retrieving your contacts…" />
       </View>
     );
   }

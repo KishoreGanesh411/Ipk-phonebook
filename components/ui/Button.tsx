@@ -9,6 +9,7 @@ import {
   Text as RNText,
   StyleProp,
   StyleSheet,
+  View,
   ViewStyle,
 } from "react-native";
 
@@ -22,6 +23,7 @@ type ButtonProps = {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   accessibilityLabel?: string;
+  loadingText?: string;
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -34,6 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
   leftIcon,
   rightIcon,
   accessibilityLabel,
+  loadingText,
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const animateTo = (to: number) => {
@@ -108,7 +111,25 @@ export const Button: React.FC<ButtonProps> = ({
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
       {loading ? (
-        <ActivityIndicator color={isLightMode ? "#1A1A1A" : "#FFFFFF"} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <ActivityIndicator color={isLightMode ? "#1A1A1A" : "#FFFFFF"} />
+          {loadingText ? (
+            <RNText
+              style={[
+                {
+                  color: isLightMode ? "#1A1A1A" : "#FFFFFF",
+                  fontWeight: "700",
+                  fontSize: 16,
+                  opacity: contentOpacity,
+                },
+                textStyle,
+              ]}
+              numberOfLines={1}
+            >
+              {loadingText}
+            </RNText>
+          ) : null}
+        </View>
       ) : (
         <>
           {leftIcon}

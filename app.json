@@ -23,8 +23,12 @@
       "permissions": [
         "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS",
-        "android.permission.READ_CONTACTS",
-        "android.permission.WRITE_CONTACTS"
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.READ_CALL_LOG",
+        "android.permission.READ_PHONE_NUMBERS",
+        "android.permission.MANAGE_OWN_CALLS",
+        "android.permission.ANSWER_PHONE_CALLS"
       ],
       "package": "com.anonymous.Ipkphonebook"
     },
@@ -56,6 +60,10 @@
         }
       ]
     ],
+    "extra": {
+      "EXPO_PUBLIC_GRAPHQL_URL": "http://192.168.0.103:3333/graphql",
+      "EXPO_PUBLIC_API_URL": "http://192.168.0.103:3333"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

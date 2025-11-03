@@ -1,10 +1,11 @@
 import { useQuery } from '@apollo/client/react';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
+import { LoadingState } from '@/components/feedback/LoadingState';
 import { LEADS_BY_STAGE_QUERY, STAGE_SUMMARY_QUERY } from '@/core/graphql/queries';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -148,9 +149,7 @@ export function StageLeadsScreen() {
           );
         }}
         ListEmptyComponent={summaryLoading ? (
-          <View style={{ paddingVertical: 12 }}>
-            <ActivityIndicator />
-          </View>
+          <LoadingState style={{ paddingVertical: 12 }} message="Loading, please wait…" />
         ) : null}
       />
 
@@ -181,7 +180,11 @@ export function StageLeadsScreen() {
         )}
         ListEmptyComponent={(
           <View style={{ padding: 24, alignItems: 'center' }}>
-            {leadsLoading ? <ActivityIndicator /> : <Text tone="muted">No leads found for this stage.</Text>}
+            {leadsLoading ? (
+              <LoadingState message="Retrieving your data…" />
+            ) : (
+              <Text tone="muted">No leads found for this stage.</Text>
+            )}
           </View>
         )}
       />

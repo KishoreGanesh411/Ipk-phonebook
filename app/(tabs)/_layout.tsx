@@ -92,21 +92,7 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: theme.colors.muted,
         }}
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="dashboard" color={color} size={size} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="contacts"
-          options={{
-            title: "Contacts",
-            tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="people-alt" color={color} size={size} />
+        
             ),
           }}
         />
@@ -462,3 +448,4 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
 });
+

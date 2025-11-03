@@ -1,5 +1,5 @@
 import { HomeDashboardScreen } from "@/features/home/screens";
 
-export default function HomeRoute() {
+export default function TabsIndex() {
   return <HomeDashboardScreen />;
 }

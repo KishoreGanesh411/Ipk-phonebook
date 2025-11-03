@@ -13,6 +13,17 @@ export const ME_QUERY = gql`
   }
 `;
 
+export const ACTIVE_RMS = gql`
+  query ActiveRms {
+    activeRms {
+      id
+      name
+      email
+      phone
+    }
+  }
+`;
+
 export const STAGE_SUMMARY_QUERY = gql`
   query StageSummary {
     leadStageSummary {
@@ -30,6 +41,7 @@ export const LEADS_BY_STAGE_QUERY = gql`
       total
       items {
         id
+        leadCode
         name
         phone
         clientStage
@@ -85,6 +97,56 @@ export const LEAD_DETAIL_WITH_TIMELINE = gql`
         occurredAt
         tags
       }
+    }
+  }
+`;
+
+export const MY_ASSIGNED_LEADS = gql`
+  query MyAssignedLeads($page: Int!, $pageSize: Int!) {
+    myAssignedLeads(args: { page: $page, pageSize: $pageSize }) {
+      items {
+        id
+        leadCode
+        name
+        phone
+        leadSource
+        clientStage
+        assignedRM
+        assignedRmId
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+export const UPDATE_LEAD_DETAILS_AFTER_CALL = gql`
+  mutation UpdateLeadDetailsAfterCall(
+    $leadId: ID!
+    $channel: InteractionChannel!
+    $nextFollowUpAt: DateTime
+    $note: String!
+    $productExplained: Boolean!
+    $stage: ClientStage!
+  ) {
+    changeStage(
+      input: {
+        leadId: $leadId
+        channel: $channel
+        nextFollowUpAt: $nextFollowUpAt
+        note: $note
+        productExplained: $productExplained
+        stage: $stage
+      }
+    ) {
+      id
+      firstName
+      lastName
+      phone
+      email
+      clientStage
+      nextActionDueAt
+      updatedAt
     }
   }
 `;

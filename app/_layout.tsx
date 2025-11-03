@@ -1,12 +1,14 @@
-import { Slot, useRouter, useSegments } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-
 import { AppSplash } from "@/components/ui/AppSplash";
 import { apolloClient } from "@/core/graphql/apolloClient";
 import { ThemeProvider } from "@/core/theme/ThemeProvider";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { ApolloProvider } from "@apollo/client/react";
+import { Slot, useRouter, useSegments } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+
+
+
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {

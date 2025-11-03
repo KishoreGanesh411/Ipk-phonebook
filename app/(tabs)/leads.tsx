@@ -1,6 +1,5 @@
-import { StageLeadsScreen } from "@/features/leads/screens/StageLeadsScreen";
+import { MyLeadsScreen } from "@/features/leads/screens/MyLeadsScreen";
 
 export default function LeadsRoute() {
-  return <StageLeadsScreen />;
+  return <MyLeadsScreen />;
 }
-

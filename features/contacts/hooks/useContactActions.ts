@@ -9,12 +9,24 @@ export const useContactActions = () => {
   const startCall = useCallStore((state) => state.startCall);
 
   const dial = useCallback(
-    (contact: Contact) => {
+    async (contact: Contact) => {
       if (!contact.phone) {
         toast("No phone number available");
         return;
       }
-      startCall(contact.phone);
+      const normalized = contact.phone.replace(/\s|[-()]/g, "");
+      const url = `tel:${normalized}`;
+      try {
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+          startCall(contact.phone);
+          await Linking.openURL(url);
+        } else {
+          toast("Calling not supported on this device");
+        }
+      } catch {
+        toast("Unable to start call");
+      }
     },
     [startCall]
   );
