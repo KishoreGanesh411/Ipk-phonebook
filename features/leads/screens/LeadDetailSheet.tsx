@@ -6,7 +6,7 @@ import { Linking, Modal, Pressable, ScrollView, StyleSheet, View, TextInput, Swi
 
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
-import { LEAD_DETAIL_WITH_TIMELINE } from '@/core/graphql/queries';
+import { LEAD_BASIC, LEAD_DETAIL_WITH_TIMELINE } from '@/core/graphql/queries';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { LoadingState } from '@/components/feedback/LoadingState';
 import { updateLeadAfterCall } from '@/features/leads/services/interactions.service';
@@ -21,14 +21,40 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
   const theme = useTheme();
   const styles = makeStyles(theme);
 
-  const { data, loading, refetch } = useQuery(LEAD_DETAIL_WITH_TIMELINE, {
+  const { data, loading, refetch, error } = useQuery(LEAD_DETAIL_WITH_TIMELINE, {
     variables: { leadId: leadId!, eventsLimit: 30 },
-    skip: !leadId || !visible,
+    skip: !leadId,
     fetchPolicy: 'cache-and-network',
+    nextFetchPolicy: 'cache-first',
+    returnPartialData: true,
+    notifyOnNetworkStatusChange: true,
   });
 
-  const lead = data?.leadDetailWithTimeline;
-  const title = lead?.name || 'Lead details';
+  // Fallback: if detail-with-timeline is not available on backend, try minimal lead() query
+  const {
+    data: basicData,
+    loading: basicLoading,
+    refetch: refetchBasic,
+    error: basicError,
+  } = useQuery(LEAD_BASIC, {
+    variables: { id: leadId! },
+    skip: !leadId,
+    fetchPolicy: 'cache-and-network',
+    nextFetchPolicy: 'cache-first',
+    returnPartialData: true,
+    notifyOnNetworkStatusChange: true,
+  });
+
+  // When the sheet becomes visible, force a refetch if we don't have data yet
+  React.useEffect(() => {
+    if (visible && leadId) {
+      if (!data) refetch().catch(() => {});
+      if (!basicData) refetchBasic().catch(() => {});
+    }
+  }, [visible, leadId]);
+
+  const lead = data?.leadDetailWithTimeline ?? basicData?.lead;
+  const title = 'Lead identity';
 
   const primaryPhone = useMemo(() => {
     if (!lead?.phones?.length) return lead?.phone;
@@ -98,27 +124,42 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
           <View style={styles.sheet}>
             {/* header */}
             <View style={styles.header}>
-              <Text size="lg" weight="bold">{title}</Text>
+              <View style={{ flex: 1 }}>
+                <Text size="lg" weight="bold">{title}</Text>
+                {!!lead?.leadCode && (
+                  <Text size="sm" tone="muted" style={{ marginTop: 2 }}>{lead.leadCode}</Text>
+                )}
+              </View>
               <Pressable onPress={onClose} style={styles.closeBtn} accessibilityLabel="Close">
                 <MaterialIcons name="close" size={22} color={theme.colors.text} />
               </Pressable>
             </View>
 
-            {loading && (
+            {(loading || basicLoading) && (
               <LoadingState style={{ paddingVertical: 24 }} message="Retrieving your data..." />
             )}
 
-            {!loading && !lead && (
+            {!lead && !(loading || basicLoading) && (
               <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                <Text tone="muted">Unable to load lead.</Text>
+                {error || basicError ? (
+                  <>
+                    <Text tone="muted">Unable to load lead.</Text>
+                    <Text size="sm" tone="muted" style={{ marginTop: 6 }}>
+                      {String(error?.message ?? basicError?.message ?? '')}
+                    </Text>
+                  </>
+                ) : (
+                  <LoadingState style={{ paddingVertical: 8 }} message="Loading..." />
+                )}
               </View>
             )}
 
-            {!!lead && (
-              <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {!!lead && (
+                  <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Quick facts */}
                 <Card style={styles.card}>
                   <Text weight="semibold" style={styles.sectionTitle}>Quick info</Text>
+                  <Meta line1="Full name" line2={lead.name || '-'} />
                   <View style={styles.row}>
                     <MaterialIcons name="phone" size={18} color={theme.colors.primary} />
                     <Text style={styles.rowText}>{primaryPhone || 'Not captured'}</Text>
@@ -156,17 +197,44 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                       <Text style={styles.rowText}>{lead.location}</Text>
                     </View>
                   ) : null}
+                  <View style={[styles.row, { marginTop: 6 }]}> 
+                    <MaterialIcons name="event" size={18} color={theme.colors.primary} />
+                    <Text style={styles.rowText}>
+                      Entered on: {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : '-'}
+                    </Text>
+                  </View>
+                  <View style={[styles.row, { marginTop: 2 }]}> 
+                    <MaterialIcons name="hourglass-bottom" size={18} color={theme.colors.primary} />
+                    <Text style={styles.rowText}>Aging days: {lead.createdAt ? Math.max(0, Math.floor((Date.now() - new Date(lead.createdAt).getTime()) / 86_400_000)) : '-'}</Text>
+                  </View>
                 </Card>
 
                 {/* Meta */}
                 <Card style={styles.card}>
-                  <Text weight="semibold" style={styles.sectionTitle}>Lead meta</Text>
+                  <Text weight="semibold" style={styles.sectionTitle}>Lead details</Text>
                   <Meta line1="Lead code" line2={lead.leadCode || '-'} />
                   <Meta line1="Stage" line2={slugToLabel(lead.clientStage)} />
                   <Meta line1="Status" line2={lead.status} />
                   <Meta line1="Lead source" line2={lead.leadSource || '-'} />
+                  <Meta line1="Gender" line2={lead.gender ? slugToLabel(lead.gender) : '-'} />
                   {lead.referralName ? <Meta line1="Referral" line2={lead.referralName} /> : null}
-                  {lead.nextActionDueAt ? <Meta line1="Next follow-up" line2={new Date(lead.nextActionDueAt).toLocaleString()} /> : null}
+                  {typeof lead.contactAttempts === 'number' ? (
+                    <Meta line1="Contact attempts" line2={String(lead.contactAttempts)} />
+                  ) : null}
+                  {lead.lastContactedAt ? (
+                    <Meta line1="Last contacted" line2={new Date(lead.lastContactedAt).toLocaleString()} />
+                  ) : null}
+                  {/* Occupation summary */}
+                  {Array.isArray(lead.occupations) && lead.occupations.length > 0 ? (
+                    <Meta
+                      line1="Occupation"
+                      line2={
+                        lead.occupations
+                          .map((o: any) => [o.profession, o.companyName, o.designation].filter(Boolean).join(' · '))
+                          .join(' | ')
+                      }
+                    />
+                  ) : null}
                 </Card>
 
                 {/* Remarks / Bio */}
@@ -175,6 +243,18 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                     <Text weight="semibold" style={styles.sectionTitle}>Remarks</Text>
                     {lead.remark ? <Text style={{ marginTop: 6 }}>{String(lead.remark)}</Text> : null}
                     {lead.bioText ? <Text style={{ marginTop: 12 }} tone="muted">{lead.bioText}</Text> : null}
+                  </Card>
+                ) : null}
+
+                {/* Product */}
+                {(lead.product || lead.investmentRange || lead.sipAmount) ? (
+                  <Card style={styles.card}>
+                    <Text weight="semibold" style={styles.sectionTitle}>Product & investment</Text>
+                    {lead.product ? <Meta line1="Product" line2={slugToLabel(lead.product)} /> : null}
+                    {lead.investmentRange ? <Meta line1="Investment range" line2={lead.investmentRange} /> : null}
+                    {typeof lead.sipAmount === 'number' ? (
+                      <Meta line1="SIP amount" line2={`₹${lead.sipAmount}`} />
+                    ) : null}
                   </Card>
                 ) : null}
 
@@ -373,4 +453,3 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) =>
       backgroundColor: 'rgba(70,95,255,0.1)',
     },
   });
-

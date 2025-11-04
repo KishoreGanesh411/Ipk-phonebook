@@ -101,6 +101,24 @@ export const LEAD_DETAIL_WITH_TIMELINE = gql`
   }
 `;
 
+// Minimal fallback for servers that don't implement the detail+timeline resolver
+export const LEAD_BASIC = gql`
+  query LeadBasic($id: ID!) {
+    lead(id: $id) {
+      id
+      leadCode
+      status
+      clientStage
+      name
+      phone
+      email
+      leadSource
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 export const MY_ASSIGNED_LEADS = gql`
   query MyAssignedLeads($page: Int!, $pageSize: Int!) {
     myAssignedLeads(args: { page: $page, pageSize: $pageSize }) {

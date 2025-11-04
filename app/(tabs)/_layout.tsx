@@ -92,7 +92,14 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: theme.colors.muted,
         }}
       >
-        
+        {/* Home tab (was showing as "index") */}
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Home",
+            tabBarLabel: "Home",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="home" color={color} size={size} />
             ),
           }}
         />
