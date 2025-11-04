@@ -30,7 +30,7 @@ function deriveLocalGraphqlUrl(): string {
     return `http://${hostUri}:3333/graphql`;
   }
   // Fallbacks
-  if (Platform.OS === "android") return "http://10.0.2.2:3333/graphql";
+  if (Platform.OS === "android") return "http://192.168.0.130:3333/graphql";
   return "http://localhost:3333/graphql";
 }
 

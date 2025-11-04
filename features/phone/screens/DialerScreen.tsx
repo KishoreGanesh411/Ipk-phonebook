@@ -4,7 +4,8 @@ import { AnimatePresence, MotiView } from "moti";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, TextInput, View } from "react-native";
 import DialPad from "../components/DialPad";
-
+import { usePhoneCall } from "../hooks/usePhoneCall";
+import { CallFollowUpModal } from "@/features/phone/components/CallFollowUpModal";
 type Lead = { id: string; name: string; phone: string; code?: string };
 
 const SAMPLE_LEADS: Lead[] = [
@@ -29,6 +30,7 @@ const normalize = (s: string) => s.replace(/\s|\-|\(|\)/g, "");
 const toT9 = (s: string) => s.toLowerCase().split("").map((ch) => T9[ch] ?? ch).join("");
 
 export default function DialerScreen() {
+   const { makeCall, isPopupVisible, hideFollowUp, lastDialed, receivedCalls } = usePhoneCall();
   const [query, setQuery] = useState("");
   const [dial, setDial] = useState("");
   const [open, setOpen] = useState(false);
@@ -106,7 +108,11 @@ export default function DialerScreen() {
               <Text weight="semibold" className="text-gray-900 dark:text-gray-100">{item.name}</Text>
               <Text size="sm" className="text-gray-500 dark:text-gray-400">{item.phone}{item.code ? '  •  ' + item.code : ''}</Text>
             </View>
-            <Pressable onPress={() => startCall(item.phone)} className="px-3 py-1.5 rounded-lg bg-emerald-600">
+            <Pressable onPress={() => {
+              // Kick off native dial and let hook handle popup on return
+              makeCall(item.phone);
+              startCall(item.phone);
+            }} className="px-3 py-1.5 rounded-lg bg-emerald-600">
               <Text weight="bold" className="text-white">Call</Text>
             </Pressable>
           </View>
@@ -131,6 +137,7 @@ export default function DialerScreen() {
         onClose={() => setOpen(false)}
         onCall={(n) => {
           setOpen(false);
+          makeCall(n);
           startCall(n);
         }}
       />
@@ -160,7 +167,19 @@ export default function DialerScreen() {
           </MotiView>
         )}
       </AnimatePresence>
+
+      {/* Follow-up modal after call ends */}
+      <CallFollowUpModal
+        visible={isPopupVisible}
+        onClose={hideFollowUp}
+        phoneNumber={lastDialed}
+        recentCalls={receivedCalls}
+        onSubmit={async (data) => {
+          // TODO: Hook up to backend via features/leads/services/interactions.service.ts if you have leadId
+          // For now, just log the submission
+          console.log("Follow-up saved", { number: lastDialed, ...data });
+        }}
+      />
     </View>
   );
 }
-
