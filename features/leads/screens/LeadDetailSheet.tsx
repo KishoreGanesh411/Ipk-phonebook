@@ -2,13 +2,14 @@ import { useQuery } from '@apollo/client/react';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import React, { useMemo, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, View, TextInput, Switch } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LoadingState } from '@/components/feedback/LoadingState';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import { LEAD_BASIC, LEAD_DETAIL_WITH_TIMELINE } from '@/core/graphql/queries';
 import { useTheme } from '@/core/theme/ThemeProvider';
-import { LoadingState } from '@/components/feedback/LoadingState';
 import { updateLeadAfterCall } from '@/features/leads/services/interactions.service';
 
 type Props = {
@@ -279,9 +280,8 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
               </ScrollView>
             )}
 
-            {/* Footer actions */}
             {!!lead && (
-              <View style={styles.footer}>
+              <SafeAreaView edges={['bottom']} style={styles.footer}>
                 <Pressable onPress={() => refetch()} style={styles.footerBtn}>
                   <MaterialIcons name="refresh" size={18} color="#fff" />
                   <Text weight="bold" size="sm" style={{ color: '#fff', marginLeft: 6 }}>Refresh</Text>
@@ -294,7 +294,7 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                   <MaterialIcons name="note-add" size={18} color="#fff" />
                   <Text weight="bold" size="sm" style={{ color: '#fff', marginLeft: 6 }}>Log Interaction</Text>
                 </Pressable>
-              </View>
+              </SafeAreaView>
             )}
           </View>
         </View>

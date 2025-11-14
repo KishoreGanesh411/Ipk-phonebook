@@ -56,6 +56,7 @@ GoogleService-Info.plist
 .env.local
 .env.production
 .env.development
+package-lock.json
 
 # Build caches
 .expo-shared/

@@ -1,261 +1,167 @@
-import React, { useMemo, useState } from "react";
+﻿// features/phone/components/CallFollowUpModal.tsx
+import React, { useState } from "react";
 import {
+  Alert,
   Modal,
-  View,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Platform,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { logCallInteraction } from "../../leads/services/interactions.service";
 
-import { Card } from "@/components/ui/Card";
-import { Field } from "@/components/ui/Field";
-import { Text } from "@/components/ui/Text";
-import { Button } from "@/components/ui/Button";
-import { useTheme } from "@/core/theme/ThemeProvider";
-import type { ReceivedCall } from "@/features/phone/hooks/usePhoneCall";
-import type { StageKey } from "@/features/leads/screens/type";
+export type LeadSummary = { id: string; name?: string; phone?: string } | null;
 
-type Props = {
+export interface CallFollowUpModalProps {
   visible: boolean;
+  durationSeconds: number;
+  lead: LeadSummary;
   onClose: () => void;
-  phoneNumber?: string | null;
-  recentCalls?: ReceivedCall[];
-  onSubmit?: (data: {
-    nextFollowUpAt?: string | null;
-    clientStatus?: string | null;
-    stage?: StageKey | null;
-    notes?: string | null;
-  }) => Promise<void> | void;
-};
+}
 
-const STAGES: StageKey[] = [
-  "NEW_LEAD",
-  "FIRST_TALK_DONE",
-  "CLIENT_INTERESTED",
-  "FOLLOWING_UP",
-  "ACCOUNT_OPENED",
-  "HIBERNATED",
-  "NO_RESPONSE_DORMANT",
-  "NOT_INTERESTED_DORMANT",
-  "RISKY_CLIENT_DORMANT",
-];
-
-export function CallFollowUpModal({
+export default function CallFollowUpModal({
   visible,
+  durationSeconds,
+  lead,
   onClose,
-  phoneNumber,
-  recentCalls = [],
-  onSubmit,
-}: Props) {
-  const theme = useTheme();
-  const styles = makeStyles(theme);
-  const [nextFollowUpAt, setNextFollowUpAt] = useState("");
-  const [clientStatus, setClientStatus] = useState("");
-  const [stage, setStage] = useState<StageKey | null>(null);
+}: CallFollowUpModalProps) {
   const [notes, setNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [nextAction, setNextAction] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const canSubmit = useMemo(() => {
-    return !!(clientStatus || notes || nextFollowUpAt || stage);
-  }, [clientStatus, notes, nextFollowUpAt, stage]);
-
-  const handleSubmit = async () => {
-    if (!canSubmit) return onClose();
+  const handleSave = async () => {
     try {
-      setSubmitting(true);
-      await onSubmit?.({
-        nextFollowUpAt: nextFollowUpAt || null,
-        clientStatus: clientStatus || null,
-        stage: stage ?? null,
-        notes: notes || null,
+      setSaving(true);
+      await logCallInteraction({
+        leadId: lead?.id,
+        phone: lead?.phone ?? "",
+        durationSeconds: Math.max(1, Math.round(durationSeconds || 0)),
+        notes,
+        nextAction,
       });
-    } finally {
-      setSubmitting(false);
       onClose();
+      setNotes("");
+      setNextAction("");
+    } catch (err) {
+      console.error("logCallInteraction failed", err);
+      Alert.alert("Call Follow-up", "Failed to save follow-up. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
+  const leadLine = lead?.name || lead?.phone ? `${lead?.name ?? ""}${lead?.name && lead?.phone ? " • " : ""}${lead?.phone ?? ""}` : null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { /* blocking via BackHandler in screen */ }}>
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" />
-        <Card style={styles.sheet}>
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.headerRow}>
-              <View style={styles.headerText}>
-                <Text size="lg" weight="bold">Call Follow-up</Text>
-                {phoneNumber ? (
-                  <Text size="sm" tone="muted">For {phoneNumber}</Text>
-                ) : null}
-              </View>
-              <Pressable onPress={onClose} style={styles.closeButton} accessibilityRole="button">
-                <MaterialIcons name="close" size={22} color={theme.colors.muted} />
-              </Pressable>
-            </View>
+        <View style={styles.card}>
+          <Text style={styles.title}>Call Follow-up</Text>
+          {leadLine ? <Text style={styles.subtitle}>{leadLine}</Text> : null}
+          <Text style={styles.duration}>Call duration: {Math.max(1, Math.round(durationSeconds || 0))} sec</Text>
 
-            <View style={styles.form}>
-              <Field
-                label="Next follow-up (YYYY-MM-DD HH:mm)"
-                placeholder="2025-11-03 16:30"
-                value={nextFollowUpAt}
-                onChangeText={setNextFollowUpAt}
-                keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "default"}
-              />
+          <View style={styles.field}>
+            <Text style={styles.label}>Notes / Summary</Text>
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Add context, commitments, objections, etc."
+              placeholderTextColor="#94A3B8"
+              multiline
+              style={[styles.input, styles.multiline]}
+            />
+          </View>
 
-              <Field
-                label="Client status"
-                placeholder="e.g. Interested / No response / Not interested"
-                value={clientStatus}
-                onChangeText={setClientStatus}
-              />
+          <View style={styles.field}>
+            <Text style={styles.label}>Next action</Text>
+            <TextInput
+              value={nextAction}
+              onChangeText={setNextAction}
+              placeholder="e.g., Follow up on 18 Nov, send WhatsApp"
+              placeholderTextColor="#94A3B8"
+              style={styles.input}
+            />
+          </View>
 
-              <View style={{ gap: theme.spacing.xs }}>
-                <Text size="sm" tone="muted">Client stage</Text>
-                <View style={styles.stageGrid}>
-                  {STAGES.map((s) => {
-                    const active = stage === s;
-                    return (
-                      <Pressable
-                        key={s}
-                        onPress={() => setStage(active ? null : s)}
-                        style={[styles.stagePill, active && styles.stagePillActive]}
-                        accessibilityRole="button"
-                      >
-                        <Text size="sm" style={active ? styles.stageLabelActive : undefined}>{s.replaceAll("_", " ")}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-
-              <Field
-                label="Notes"
-                placeholder="Type important notes from the call"
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                style={{ height: 96, textAlignVertical: "top" }}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text weight="semibold">Recent calls</Text>
-              {Platform.OS === "android" ? (
-                <View style={{ gap: 6 }}>
-                  {recentCalls.length === 0 ? (
-                    <Text size="sm" tone="muted">No call log available</Text>
-                  ) : (
-                    recentCalls.map((c, idx) => (
-                      <View key={idx} style={styles.logRow}>
-                        <MaterialIcons
-                          name={c.type === "INCOMING" ? "call-received" : c.type === "OUTGOING" ? "call-made" : "call-missed"}
-                          size={16}
-                          color={theme.colors.primary}
-                        />
-                        <Text size="sm" style={{ flex: 1 }}>
-                          {c.type ?? "UNKNOWN"} · {c.dateTime ? new Date(c.dateTime).toLocaleString() : ""}
-                        </Text>
-                        {typeof c.duration === "number" ? (
-                          <Text size="sm" tone="muted">{c.duration}s</Text>
-                        ) : null}
-                      </View>
-                    ))
-                  )}
-                </View>
-              ) : (
-                <Text size="sm" tone="muted">iOS does not allow reading the system call log.</Text>
-              )}
-            </View>
-
-            <View style={styles.actions}>
-              <Button label="Save follow-up" onPress={handleSubmit} loading={submitting} disabled={!canSubmit && !submitting} />
-            </View>
-          </ScrollView>
-        </Card>
+          <Pressable
+            onPress={handleSave}
+            disabled={saving}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              saving ? { opacity: 0.6 } : undefined,
+              pressed ? { opacity: 0.9 } : undefined,
+            ]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.primaryBtnText}>{saving ? "Saving..." : "Save & Continue"}</Text>
+          </Pressable>
+        </View>
       </View>
     </Modal>
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useTheme>) =>
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      backgroundColor: "rgba(16, 24, 40, 0.45)",
-      padding: theme.spacing.lg,
-    },
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    sheet: {
-      width: "100%",
-      maxWidth: 520,
-      padding: 0,
-      borderRadius: theme.radii.lg,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    },
-    content: {
-      padding: theme.spacing.lg,
-      gap: theme.spacing.lg,
-    },
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing.md,
-    },
-    headerText: {
-      flex: 1,
-      gap: 4,
-    },
-    closeButton: {
-      height: 36,
-      width: 36,
-      borderRadius: 18,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.background,
-    },
-    form: {
-      gap: theme.spacing.md,
-    },
-    stageGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    stagePill: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-    },
-    stagePillActive: {
-      backgroundColor: "rgba(70,95,255,0.12)",
-      borderColor: theme.colors.primary,
-    },
-    stageLabelActive: {
-      color: theme.colors.primary,
-      fontWeight: "600",
-    },
-    section: {
-      gap: 8,
-    },
-    logRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingVertical: 4,
-    },
-    actions: {
-      alignItems: "flex-end",
-    },
-  });
-
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 520,
+    borderRadius: 16,
+    backgroundColor: "#0F172A",
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#334155",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#F8FAFC",
+  },
+  subtitle: {
+    marginTop: 4,
+    color: "#CBD5E1",
+  },
+  duration: {
+    marginTop: 8,
+    color: "#CBD5E1",
+  },
+  field: {
+    marginTop: 14,
+  },
+  label: {
+    marginBottom: 6,
+    color: "#CBD5E1",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#475569",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#F8FAFC",
+    backgroundColor: "#0B1220",
+  },
+  multiline: {
+    height: 96,
+    textAlignVertical: "top",
+  },
+  primaryBtn: {
+    marginTop: 18,
+    height: 44,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4F46E5",
+  },
+  primaryBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+});

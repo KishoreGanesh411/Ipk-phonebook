@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from "react";
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, ViewStyle } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/core/theme/ThemeProvider";
 
@@ -17,6 +18,7 @@ export const FloatingAssistiveBall: React.FC<FloatingAssistiveBallProps> = ({
   rightOffset = 24,
 }) => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   const panResponder = useMemo(
@@ -39,7 +41,7 @@ export const FloatingAssistiveBall: React.FC<FloatingAssistiveBallProps> = ({
   const ballStyle: ViewStyle = {
     position: "absolute",
     right: rightOffset,
-    bottom: bottomOffset,
+    bottom: bottomOffset + insets.bottom,
     width: size,
     height: size,
     borderRadius: 999,

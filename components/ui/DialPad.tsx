@@ -106,11 +106,11 @@ export const DialPad: React.FC<DialPadProps> = ({
   }, [activeLead, ipkLeads]);
 
   const pointerEvents = visible ? "auto" : "none";
-  const numberDisplay = useMemo(() => {
-    const digits = String(value || "").replace(/\D+/g, "");
-    if (!digits) return "Enter Number";
-    return digits.replace(/(.{3})/g, "$1 ").trim();
-  }, [value]);
+const numberDisplay = useMemo(() => {
+  const digits = String(value || "").replace(/\D+/g, "");
+  if (!digits) return "Enter Number";
+  return digits.replace(/(.{3})/g, "$1 ").trim();
+}, [value]);
 
   const callerIdentity = contacts?.[0];
   const normalizedDial = useMemo(() => sanitizeNumber(value), [value]);
@@ -556,8 +556,6 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   topContent: {
-  flexGrow: 1,
-  flexShrink: 1,
   justifyContent: "flex-start",
   alignItems: "center",
   marginTop: 100,        // ← Increase this number to move the number section down
@@ -608,10 +606,11 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
   numberDisplay: {
-    paddingVertical: 10,
-    alignItems: "center",
-    marginTop: 12,
-    marginBottom: 12,
+  width: "100%",
+  paddingVertical: 10,
+  alignItems: "center",
+  marginTop: 12,
+  marginBottom: 12,
   },
   numberText: {
     fontSize: 32,
@@ -841,9 +840,9 @@ const styles = StyleSheet.create({
     color: "#0F172A",
   },
   emptyBody: {
-    fontSize: 13,
-    color: "#475569",
-    textAlign: "center",
+  fontSize: 13,
+  color: "#475569",
+  textAlign: "center",
   },
 });
 

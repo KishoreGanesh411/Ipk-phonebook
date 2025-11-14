@@ -11,9 +11,11 @@ import { useCallStore } from "@/features/phone/store/call.store";
 import { Text } from "@/components/ui/Text";
 import { formatPhone } from "@/core/utils/format";
 import { ipkLeadPipeline } from "@/features/leads/data/ipkLeadModel";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [dialOpen, setDialOpen] = useState(false);
   const activeCall = useCallStore((state) => state.activeCall);
   const startCall = useCallStore((state) => state.startCall);
@@ -132,7 +134,10 @@ export default function TabsLayout() {
       />
 
       {activeCall && callShowcase && (
-        <View style={styles.callOverlay}>
+        <View style={[
+          styles.callOverlay,
+          { paddingBottom: Math.max(30, 12 + insets.bottom) },
+        ]}>
           <View style={styles.callOverlayDecorOne} />
           <View style={styles.callOverlayDecorTwo} />
           <View style={styles.callOverlayContent}>
@@ -225,7 +230,7 @@ export default function TabsLayout() {
       )}
 
       {activeCall && !callShowcase && (
-        <View style={styles.callBanner}>
+        <View style={[styles.callBanner, { bottom: Math.max(24, 12 + insets.bottom) }]}>
           <View>
             <Text size="sm" tone="muted">
               Calling

@@ -1,166 +1,142 @@
+﻿// features/phone/hooks/usePhoneCall.ts
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, AppStateStatus, Linking, Platform } from "react-native";
-import CallDetectorManager from "react-native-call-detection";
-import { check, request, PERMISSIONS, RESULTS } from "react-native-permissions";
+import { Alert, AppState, AppStateStatus, Linking } from "react-native";
 
-// Android-only: call logs
-let CallLogs: any = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  CallLogs = require("react-native-call-log");
-} catch (e) {
-  // optional on iOS/web
+export type ActiveLead = { id: string; name?: string; phone?: string } | null;
+
+export interface UsePhoneCallReturn {
+  phoneNumber: string;
+  setPhoneNumber: (value: string) => void;
+
+  isCalling: boolean;
+  isFollowUpOpen: boolean;
+  callDurationSeconds: number | null;
+  activeLead: ActiveLead;
+
+  startCall: (opts?: {
+    leadId?: string;
+    leadName?: string;
+    phone?: string;
+  }) => Promise<void>;
+  closeFollowUp: () => void;
 }
 
-export type ReceivedCall = {
-  number: string;
-  name?: string;
-  type?: string; // INCOMING/OUTGOING/MISSED
-  dateTime?: string; // ISO string
-  duration?: number; // seconds
+const normalizePhone = (raw: string): string => {
+  if (!raw) return "";
+  const cleaned = raw.replace(/[^\d+]/g, "");
+  if (!cleaned) return "";
+  if (cleaned.startsWith("+")) {
+    return "+" + cleaned.slice(1).replace(/\+/g, "");
+  }
+  return cleaned.replace(/\+/g, "");
 };
 
-export function usePhoneCall() {
-  const [callDetector, setCallDetector] = useState<any>(null);
-  const [isPopupVisible, setPopupVisible] = useState(false);
-  const [lastDialed, setLastDialed] = useState<string | null>(null);
-  const [receivedCalls, setReceivedCalls] = useState<ReceivedCall[]>([]);
-
-  const pendingDialRef = useRef<{ number: string; startedAt: number } | null>(
+export function usePhoneCall(): UsePhoneCallReturn {
+  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [isCalling, setIsCalling] = useState<boolean>(false);
+  const [isFollowUpOpen, setIsFollowUpOpen] = useState<boolean>(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [callDurationSeconds, setCallDurationSeconds] = useState<number | null>(
     null
   );
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const [activeLead, setActiveLead] = useState<ActiveLead>(null);
 
-  const fetchAndroidCallLogs = useCallback(
-    async (phone?: string) => {
-      if (Platform.OS !== "android" || !CallLogs) return;
-      try {
-        // Request READ_CALL_LOG permission if needed
-        const perm = await check(PERMISSIONS.ANDROID.READ_CALL_LOG);
-        if (perm !== RESULTS.GRANTED) {
-          const res = await request(PERMISSIONS.ANDROID.READ_CALL_LOG);
-          if (res !== RESULTS.GRANTED) return;
-        }
-        // Some packages expose .load, others expose .getAll
-        // We try .load first, then fall back.
-        let rawLogs: any[] = [];
-        if (typeof CallLogs.load === "function") {
-          rawLogs = await CallLogs.load(20);
-        } else if (CallLogs?.default?.load) {
-          rawLogs = await CallLogs.default.load(20);
-        } else if (typeof CallLogs.getAll === "function") {
-          rawLogs = await CallLogs.getAll();
-        } else if (CallLogs?.default?.getAll) {
-          rawLogs = await CallLogs.default.getAll();
-        }
-        const normalizedPhone = phone?.replace(/[\s\-()]/g, "");
-        const mapped: ReceivedCall[] = (rawLogs || [])
-          .map((l: any) => ({
-            number: String(l.phoneNumber || l.number || ""),
-            name: l.name ?? l.cachedName ?? undefined,
-            type: l.type || l.callType,
-            dateTime: l.timestamp
-              ? new Date(Number(l.timestamp)).toISOString()
-              : l.dateTime || undefined,
-            duration: l.duration ? Number(l.duration) : undefined,
-          }))
-          .filter((it) => it.number)
-          .filter((it) =>
-            normalizedPhone ? it.number.replace(/[\s\-()]/g, "") === normalizedPhone : true
-          )
-          .slice(0, 5);
-        setReceivedCalls(mapped);
-      } catch (err) {
-        // Swallow errors; call logs are best-effort.
-      }
-    },
-    []
-  );
+  // Refs to avoid stale closures in AppState handler
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const isCallingRef = useRef<boolean>(isCalling);
+  const callStartedAtRef = useRef<number | null>(callStartedAt);
 
   useEffect(() => {
-    // Android: live call state detection
-    if (Platform.OS === "android") {
-      // Ensure phone state permission for call state callbacks
-      (async () => {
-        try {
-          const p = await check(PERMISSIONS.ANDROID.READ_PHONE_STATE);
-          if (p !== RESULTS.GRANTED) {
-            await request(PERMISSIONS.ANDROID.READ_PHONE_STATE);
-          }
-        } catch {}
-      })();
+    isCallingRef.current = isCalling;
+  }, [isCalling]);
 
-      const detector = new CallDetectorManager(
-        async (event) => {
-          if (event === "Disconnected") {
-            setPopupVisible(true);
-            await fetchAndroidCallLogs(pendingDialRef.current?.number || undefined);
-          }
-        },
-        true,
-        () => {},
-        {
-          title: "Phone Permission",
-          message: "We need access to detect call state.",
-        }
-      );
-      setCallDetector(detector);
-    }
+  useEffect(() => {
+    callStartedAtRef.current = callStartedAt;
+  }, [callStartedAt]);
 
-    const sub = AppState.addEventListener("change", async (next) => {
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
       const prev = appStateRef.current;
       appStateRef.current = next;
-      // iOS: after we return to foreground from a dial, show popup
+
+      const wasBackground = prev === "background" || prev === "inactive";
       if (
-        Platform.OS === "ios" &&
-        prev !== "active" &&
+        wasBackground &&
         next === "active" &&
-        pendingDialRef.current
+        isCallingRef.current === true &&
+        callStartedAtRef.current != null
       ) {
-        setPopupVisible(true);
-        pendingDialRef.current = null;
+        const seconds = Math.max(
+          1,
+          Math.round((Date.now() - (callStartedAtRef.current as number)) / 1000)
+        );
+        setCallDurationSeconds(seconds);
+        setIsCalling(false);
+        setIsFollowUpOpen(true);
       }
     });
 
     return () => {
       sub.remove();
-      if (callDetector) callDetector.dispose();
     };
-  }, [fetchAndroidCallLogs, callDetector]);
-
-  const makeCall = useCallback(async (phoneNumber: string) => {
-    const url = `tel:${phoneNumber}`;
-    setLastDialed(phoneNumber);
-
-    if (Platform.OS === "android") {
-      const permission = await check(PERMISSIONS.ANDROID.CALL_PHONE);
-      if (permission !== RESULTS.GRANTED) {
-        await request(PERMISSIONS.ANDROID.CALL_PHONE);
-      }
-    }
-
-    pendingDialRef.current = { number: phoneNumber, startedAt: Date.now() };
-    await Linking.openURL(url);
-
-    if (Platform.OS === "ios") {
-      // Fallback: if AppState callback doesn't fire (some env), still show after a delay
-      setTimeout(() => {
-        if (pendingDialRef.current) {
-          setPopupVisible(true);
-          pendingDialRef.current = null;
-        }
-      }, 3500);
-    }
   }, []);
 
-  const hidePopup = useCallback(() => setPopupVisible(false), []);
+  const startCall = useCallback<UsePhoneCallReturn["startCall"]>(
+    async (opts) => {
+      const sourceNumber = opts?.phone ?? phoneNumber;
+      const normalized = normalizePhone(sourceNumber);
+
+      if (!normalized) {
+        Alert.alert("Dialer", "Enter a phone number first");
+        return;
+      }
+
+      if (opts?.leadId) {
+        setActiveLead({
+          id: String(opts.leadId),
+          name: opts.leadName,
+          phone: opts.phone ?? sourceNumber,
+        });
+      } else {
+        setActiveLead(null);
+      }
+
+      const url = `tel:${normalized}`;
+      try {
+        const canOpen = await Linking.canOpenURL(url);
+        if (!canOpen) {
+          Alert.alert("Dialer", "This device cannot place phone calls.");
+          return;
+        }
+
+        setIsCalling(true);
+        setCallStartedAt(Date.now());
+        setCallDurationSeconds(null);
+
+        await Linking.openURL(url);
+      } catch (err) {
+        console.error("Failed to open dialer", err);
+        setIsCalling(false);
+        setCallStartedAt(null);
+        Alert.alert("Dialer", "Failed to open the phone app.");
+      }
+    },
+    [phoneNumber]
+  );
+
+  const closeFollowUp = useCallback(() => {
+    setIsFollowUpOpen(false);
+    setCallDurationSeconds(null);
+  }, []);
 
   return {
-    makeCall,
-    isPopupVisible,
-    showFollowUp: () => setPopupVisible(true),
-    hideFollowUp: hidePopup,
-    lastDialed,
-    receivedCalls,
+    phoneNumber,
+    setPhoneNumber,
+    isCalling,
+    isFollowUpOpen,
+    callDurationSeconds,
+    activeLead,
+    startCall,
+    closeFollowUp,
   };
 }

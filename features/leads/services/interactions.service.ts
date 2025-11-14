@@ -1,7 +1,7 @@
-import { apolloClient } from '@/core/graphql/apolloClient';
-import { UPDATE_LEAD_DETAILS_AFTER_CALL } from '@/core/graphql/queries';
+import { apolloClient } from "@/core/graphql/apolloClient";
+import { ADD_LEAD_INTERACTION, UPDATE_LEAD_DETAILS_AFTER_CALL } from "@/core/graphql/queries";
 
-export type InteractionChannel = 'CALL' | 'WHATSAPP' | 'EMAIL' | 'SMS' | 'OTHER';
+export type InteractionChannel = "CALL" | "WHATSAPP" | "EMAIL" | "SMS" | "OTHER";
 
 export async function updateLeadAfterCall(params: {
   leadId: string;
@@ -18,7 +18,7 @@ export async function updateLeadAfterCall(params: {
     note,
     productExplained,
     nextFollowUpAt: nextFollowUpAt ?? null,
-    stage: (stage as any) ?? 'CLIENT_INTERESTED',
+    stage: (stage as any) ?? "CLIENT_INTERESTED",
   } as any;
   const { data } = await apolloClient.mutate({
     mutation: UPDATE_LEAD_DETAILS_AFTER_CALL,
@@ -27,3 +27,39 @@ export async function updateLeadAfterCall(params: {
   return data?.changeStage;
 }
 
+export async function logCallInteraction(input: {
+  leadId?: string;
+  phone: string;
+  durationSeconds: number;
+  notes: string;
+  nextAction: string;
+}): Promise<void> {
+  const { leadId, phone, durationSeconds, notes, nextAction } = input;
+  if (!leadId) {
+    console.warn("Skipping lead interaction: leadId missing");
+    return;
+  }
+
+  const normalizedPhone = phone?.trim();
+  const segments = [
+    notes?.trim(),
+    nextAction?.trim() ? `Next: ${nextAction.trim()}` : undefined,
+    normalizedPhone ? `Number: ${normalizedPhone}` : undefined,
+    Number.isFinite(durationSeconds)
+      ? `Duration: ${Math.max(1, Math.round(durationSeconds))}s`
+      : undefined,
+  ].filter((part): part is string => Boolean(part));
+  const text = segments.join(" | ") || "Call follow-up";
+
+  await apolloClient.mutate({
+    mutation: ADD_LEAD_INTERACTION,
+    variables: {
+      input: {
+        leadId,
+        channel: "CALL",
+        text,
+        tags: ["call", "follow-up"],
+      },
+    },
+  });
+}

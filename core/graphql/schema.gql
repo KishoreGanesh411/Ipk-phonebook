@@ -87,6 +87,7 @@ input BulkLeadRowInput {
   referralName: String
   remark: String
   sipAmount: Float
+  stageFilter: LeadStageFilter
 }
 
 input ChangeStageInput {
@@ -96,6 +97,7 @@ input ChangeStageInput {
   note: String
   productExplained: Boolean
   stage: ClientStage!
+  stageFilter: LeadStageFilter
 }
 
 input ClientQaInput {
@@ -156,6 +158,7 @@ input CreateIpkLeaddInput {
   referralName: String
   remark: String
   sipAmount: Float
+  stageFilter: LeadStageFilter
 }
 
 input CreateUserInput {
@@ -242,6 +245,7 @@ type IpkLeaddEntity {
   firstName: String
   firstSeenAt: DateTime
   gender: String
+  history: JSON
   id: ID!
   investmentRange: String
   lastContactedAt: DateTime
@@ -260,9 +264,10 @@ type IpkLeaddEntity {
   reenterCount: Int
   referralCode: String
   referralName: String
-  remark: JSON
+  remark: [RemarkModel!]
   remarks: [RemarkEntry]
   sipAmount: Int
+  stageFilter: LeadStageFilter
   status: LeadStatus!
   updatedAt: DateTime!
 }
@@ -328,6 +333,7 @@ input LeadListArgs {
   page: Int = 1
   pageSize: Int = 10
   search: String
+  stageFilter: LeadStageFilter
   stageIn: [ClientStage!]
   status: LeadStatus
 }
@@ -363,6 +369,16 @@ input LeadPhoneInput {
   isWhatsapp: Boolean! = false
   label: PhoneLabel! = MOBILE
   number: String!
+}
+
+enum LeadStageFilter {
+  FUTURE_INTERESTED
+  HIGH_PRIORITY
+  LOW_PRIORITY
+  NEED_CLARIFICATION
+  NOT_ELIGIBLE
+  NOT_INTERESTED
+  ON_PROCESS
 }
 
 enum LeadStatus {
@@ -461,6 +477,13 @@ type RemarkEntry {
   text: String!
 }
 
+type RemarkModel {
+  at: String!
+  by: String
+  byName: String
+  text: String!
+}
+
 input RmFirstContactInput {
   channel: InteractionChannel!
   leadId: ID!
@@ -522,6 +545,7 @@ input UpdateIpkLeaddInput {
   referralName: String
   remark: String
   sipAmount: Float
+  stageFilter: LeadStageFilter
 }
 
 input UpdateKycStatusInput {
@@ -557,7 +581,9 @@ input UpdateLeadDetailsInput {
   product: String
   referralCode: String
   referralName: String
+  remark: String
   sipAmount: Float
+  stageFilter: LeadStageFilter
 }
 
 input UpdateLeadRemarkInput {

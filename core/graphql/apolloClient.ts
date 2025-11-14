@@ -1,11 +1,13 @@
 // core/graphql/apolloClient.ts
-import { auth } from '@/core/firebase/firebaseConfig';
-import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
-import { ENV } from '@/config/env';
+import { ENV } from "@/config/env";
+import { auth } from "@/core/firebase/firebaseConfig";
+import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
+import { setContext } from "@apollo/client/link/context";
 
-// Resolve endpoint from environment with smart fallbacks (LAN, emulator)
-const httpLink = new HttpLink({ uri: ENV.GRAPHQL_URL });
+// Use endpoint from ENV (controlled by app.json / .env)
+const httpLink = new HttpLink({
+  uri: ENV.GRAPHQL_URL,
+});
 
 // Attach Firebase ID token so NestJS (FirebaseAuthGuard) can authenticate requests
 const authLink = setContext(async (_, { headers }) => {

@@ -54,6 +54,27 @@ export const LEADS_BY_STAGE_QUERY = gql`
   }
 `;
 
+export const LEADS_QUERY = gql`
+  query Leads($args: LeadListArgs!) {
+    leads(args: $args) {
+      items {
+        id
+        leadCode
+        name
+        phone
+        leadSource
+        clientStage
+        status
+        assignedRM
+        assignedRmId
+      }
+      page
+      pageSize
+      total
+    }
+  }
+`;
+
 export const LEAD_DETAIL_WITH_TIMELINE = gql`
   query LeadDetailWithTimeline($leadId: ID!, $eventsLimit: Int = 20) {
     leadDetailWithTimeline(leadId: $leadId, eventsLimit: $eventsLimit) {
@@ -165,6 +186,19 @@ export const UPDATE_LEAD_DETAILS_AFTER_CALL = gql`
       clientStage
       nextActionDueAt
       updatedAt
+    }
+  }
+`;
+
+export const ADD_LEAD_INTERACTION = gql`
+  mutation AddLeadInteraction($input: LeadInteractionInput!) {
+    addLeadInteraction(input: $input) {
+      id
+      leadId
+      occurredAt
+      text
+      tags
+      type
     }
   }
 `;
