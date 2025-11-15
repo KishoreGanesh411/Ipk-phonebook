@@ -106,11 +106,11 @@ export const DialPad: React.FC<DialPadProps> = ({
   }, [activeLead, ipkLeads]);
 
   const pointerEvents = visible ? "auto" : "none";
-const numberDisplay = useMemo(() => {
-  const digits = String(value || "").replace(/\D+/g, "");
-  if (!digits) return "Enter Number";
-  return digits.replace(/(.{3})/g, "$1 ").trim();
-}, [value]);
+  const numberDisplay = useMemo(() => {
+    const digits = String(value || "").replace(/\D+/g, "");
+    if (!digits) return "Enter Number";
+    return digits.replace(/(.{3})/g, "$1 ").trim();
+  }, [value]);
 
   const callerIdentity = contacts?.[0];
   const normalizedDial = useMemo(() => sanitizeNumber(value), [value]);
@@ -241,166 +241,256 @@ const numberDisplay = useMemo(() => {
             },
           ]}
         >
-          {/* Top fixed search + call-as bars */}
-          <View style={styles.topFixed}>
-            <View
-              style={[
-                styles.searchField,
-                {
-                  backgroundColor: isDark ? "#111827" : "#F3F4F6",
-                  borderWidth: 1,
-                  borderColor: isDark ? "#1F2937" : "#E5E7EB",
-                },
-              ]}
-            >
-              <MaterialIcons name="search" size={18} color="#9CA3AF" />
-              <TextInput
-                placeholder="Search leads or dial number"
-                placeholderTextColor={isDark ? "#94A3B8" : "#9BA1A6"}
-                value={search}
-                onChangeText={setSearch}
-                style={[styles.searchInput, { color: isDark ? "#F8FAFC" : "#111827" }]}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch("")}>
-                  <MaterialIcons name="close" size={18} color="#9CA3AF" />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[
-                styles.callAsRow,
-                {
-                  backgroundColor: isDark ? "#111826" : "#FFFFFF",
-                  borderColor: isDark ? "#1F2937" : "#E5E7EB",
-                },
-              ]}
-              onPress={() => setLeadSheetOpen(true)}
-            >
-              <Text style={[styles.callAsLabel, { color: isDark ? "#94A3B8" : "#6B7280" }]}>Call as</Text>
-              <View style={styles.callAsContent}>
-                <Text style={[styles.callAsName, { color: isDark ? "#F8FAFC" : "#111827" }]}>{callAsDisplayName}</Text>
-                <Text style={[styles.callAsPhone, { color: isDark ? "#CBD5F5" : "#6B7280" }]}>{callAsDisplayPhone}</Text>
-              </View>
-              <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Centered number display & optional leads list */}
-          <View style={styles.topContent}>
-            <View style={[styles.numberDisplay, dpStyles.numberContainer]}>
-              <Text
-                style={[styles.numberText, dpStyles.numberTextFit, { color: isDark ? "#F8FAFC" : "#111827" }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.6}
-                allowFontScaling
-              >
-                {numberDisplay}
-              </Text>
-            </View>
-
-            {filteredLeads.map((lead) => (
-              <TouchableOpacity
-                key={lead.id}
-                style={styles.resultRow}
-                activeOpacity={0.85}
-                onPress={() => handleSelectLead(lead)}
-              >
-                <View style={styles.resultAvatar}>
-                  <Text style={styles.resultAvatarText}>
-                    {(lead.name || "?")
-                      .split(" ")
-                      .map((c) => c.charAt(0))
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.resultName, { color: isDark ? "#F8FAFC" : "#111827" }]} numberOfLines={1}>
-                    {lead.name || "Unknown"}
-                  </Text>
-                  <Text style={[styles.resultPhone, { color: isDark ? "#94A3B8" : "#6B7280" }]} numberOfLines={1}>
-                    {lead.phone}
-                  </Text>
-                </View>
-                <MaterialIcons name="chevron-right" size={22} color="#9CA3AF" />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Spacer */}
-          <View style={{ height: 8 }} />
-
-          {/* Keypad grid */}
-          <View style={styles.padGrid}>
-            {KEY_ROWS.map((row) => (
-              <View key={row.join("-")} style={styles.row}>
-                {row.map((digit) => (
-                  <TouchableOpacity
-                    key={digit}
+          <View style={styles.contentContainer}>
+            <View style={styles.topSection}>
+              <View style={styles.topFixed}>
+                <View
+                  style={[
+                    styles.searchField,
+                    {
+                      backgroundColor: isDark ? "#111827" : "#F3F4F6",
+                      borderWidth: 1,
+                      borderColor: isDark ? "#1F2937" : "#E5E7EB",
+                    },
+                  ]}
+                >
+                  <MaterialIcons name="search" size={18} color="#9CA3AF" />
+                  <TextInput
+                    placeholder="Search leads or dial number"
+                    placeholderTextColor={isDark ? "#94A3B8" : "#9BA1A6"}
+                    value={search}
+                    onChangeText={setSearch}
                     style={[
-                      styles.key,
-                      getKeySizeStyles(screenWidth),
+                      styles.searchInput,
+                      { color: isDark ? "#F8FAFC" : "#111827" },
                     ]}
-                    activeOpacity={0.85}
-                    onPress={() => handleDigit(digit)}
+                  />
+                  {search.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearch("")}>
+                      <MaterialIcons name="close" size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[
+                    styles.callAsRow,
+                    {
+                      backgroundColor: isDark ? "#111826" : "#FFFFFF",
+                      borderColor: isDark ? "#1F2937" : "#E5E7EB",
+                    },
+                  ]}
+                  onPress={() => setLeadSheetOpen(true)}
+                >
+                  <Text
+                    style={[
+                      styles.callAsLabel,
+                      { color: isDark ? "#94A3B8" : "#6B7280" },
+                    ]}
                   >
-                    <Text style={[styles.keyLabel, getKeyLabelSizeStyles(screenWidth)]}>
-                      {digit}
+                    Call as
+                  </Text>
+                  <View style={styles.callAsContent}>
+                    <Text
+                      style={[
+                        styles.callAsName,
+                        { color: isDark ? "#F8FAFC" : "#111827" },
+                      ]}
+                    >
+                      {callAsDisplayName}
                     </Text>
-                    {KEY_HINTS[digit] && (
-                      <Text style={[styles.keyHint, getKeyHintSizeStyles(screenWidth)]}>
-                        {KEY_HINTS[digit]}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.callAsPhone,
+                        { color: isDark ? "#CBD5F5" : "#6B7280" },
+                      ]}
+                    >
+                      {callAsDisplayPhone}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.numberWrapper}>
+                <View style={[styles.numberDisplay, dpStyles.numberContainer]}>
+                  <Text
+                    style={[
+                      styles.numberText,
+                      dpStyles.numberTextFit,
+                      { color: isDark ? "#F8FAFC" : "#111827" },
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                    allowFontScaling
+                  >
+                    {numberDisplay}
+                  </Text>
+                </View>
+              </View>
+
+              {filteredLeads.length > 0 ? (
+                <ScrollView
+                  style={styles.suggestionsList}
+                  contentContainerStyle={styles.suggestionsContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {filteredLeads.map((lead) => (
+                    <TouchableOpacity
+                      key={lead.id}
+                      style={styles.resultRow}
+                      activeOpacity={0.85}
+                      onPress={() => handleSelectLead(lead)}
+                    >
+                      <View
+                        style={[
+                          styles.resultAvatar,
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(99,102,241,0.25)"
+                              : "#EEF2FF",
+                          },
+                        ]}
+                      >
+                        <Text style={styles.resultAvatarText}>
+                          {(lead.name || "?")
+                            .split(" ")
+                            .map((c) => c.charAt(0))
+                            .slice(0, 2)
+                            .join("")
+                            .toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.resultName,
+                            { color: isDark ? "#F8FAFC" : "#111827" },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {lead.name || "Unknown"}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.resultPhone,
+                            { color: isDark ? "#94A3B8" : "#6B7280" },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {lead.phone}
+                        </Text>
+                      </View>
+                      <MaterialIcons name="chevron-right" size={22} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : null}
+            </View>
+
+            <View style={styles.padSection}>
+              <View style={styles.padGrid}>
+                {KEY_ROWS.map((row) => (
+                  <View key={row.join("-")} style={styles.row}>
+                    {row.map((digit) => (
+                      <TouchableOpacity
+                        key={digit}
+                        style={[
+                          styles.key,
+                          {
+                            backgroundColor: isDark ? "#111827" : "#FFFFFF",
+                            borderColor: isDark ? "#1F2937" : "#E5E7EB",
+                          },
+                          getKeySizeStyles(screenWidth),
+                        ]}
+                        activeOpacity={0.85}
+                        onPress={() => handleDigit(digit)}
+                      >
+                        <Text
+                          style={[
+                            styles.keyLabel,
+                            getKeyLabelSizeStyles(screenWidth),
+                            { color: isDark ? "#F8FAFC" : "#111827" },
+                          ]}
+                        >
+                          {digit}
+                        </Text>
+                        {KEY_HINTS[digit] && (
+                          <Text
+                            style={[
+                              styles.keyHint,
+                              getKeyHintSizeStyles(screenWidth),
+                              { color: isDark ? "#94A3B8" : "#6B7280" },
+                            ]}
+                          >
+                            {KEY_HINTS[digit]}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 ))}
               </View>
-            ))}
-          </View>
 
-          {/* Action buttons row */}
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={[
-                styles.actionIcon,
-                getActionIconSizeStyles(screenWidth),
-                { opacity: value.length ? 1 : 0.4 },
-              ]}
-              activeOpacity={0.8}
-              onPress={handleBackspace}
-              disabled={!value.length}
-            >
-              <MaterialIcons name="backspace" size={22} color="#111827" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.callButton,
-                getCallButtonSizeStyles(screenWidth),
-                { opacity: value.length ? 1 : 0.5 },
-              ]}
-              activeOpacity={0.8}
-              onPress={handleCall}
-              disabled={!value.length}
-            >
-              <MaterialIcons name="call" size={26} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionIcon, getActionIconSizeStyles(screenWidth)]}
-              activeOpacity={0.8}
-              onPress={onClose}
-            >
-              <MaterialIcons name="dialpad" size={22} color="#111827" />
-            </TouchableOpacity>
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.actionIcon,
+                    {
+                      backgroundColor: isDark ? "#111827" : "#FFFFFF",
+                      borderColor: isDark ? "#1F2937" : "#E5E7EB",
+                    },
+                    getActionIconSizeStyles(screenWidth),
+                    { opacity: value.length ? 1 : 0.4 },
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={handleBackspace}
+                  disabled={!value.length}
+                >
+                  <MaterialIcons
+                    name="backspace"
+                    size={22}
+                    color={isDark ? "#F8FAFC" : "#111827"}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.callButton,
+                    getCallButtonSizeStyles(screenWidth),
+                    { opacity: value.length ? 1 : 0.5 },
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={handleCall}
+                  disabled={!value.length}
+                >
+                  <MaterialIcons name="call" size={26} color="#FFFFFF" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.actionIcon,
+                    {
+                      backgroundColor: isDark ? "#111827" : "#FFFFFF",
+                      borderColor: isDark ? "#1F2937" : "#E5E7EB",
+                    },
+                    getActionIconSizeStyles(screenWidth),
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={onClose}
+                >
+                  <MaterialIcons
+                    name="dialpad"
+                    size={22}
+                    color={isDark ? "#F8FAFC" : "#111827"}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-
         </Animated.View>
       </Animated.View>
-
       <LeadDetailsModal
         visible={leadSheetOpen}
         onClose={() => setLeadSheetOpen(false)}
@@ -548,19 +638,32 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     flex: 1,
-    justifyContent: "flex-start",
     paddingHorizontal: 22,
-    gap: 12,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: "space-between",
+    gap: 24,
+  },
+  topSection: {
+    flexShrink: 1,
+    gap: 16,
   },
   topFixed: {
     width: "100%",
+    gap: 12,
   },
-  topContent: {
-  justifyContent: "flex-start",
-  alignItems: "center",
-  marginTop: 100,        // ← Increase this number to move the number section down
-  marginBottom: 14,
-},
+  numberWrapper: {
+    alignItems: "center",
+  },
+  suggestionsList: {
+    maxHeight: 240,
+    width: "100%",
+  },
+  suggestionsContent: {
+    gap: 8,
+    paddingBottom: 4,
+  },
   searchField: {
     flexDirection: "row",
     alignItems: "center",
@@ -569,7 +672,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#F3F4F6",
     gap: 10,
-    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
@@ -585,7 +687,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     backgroundColor: "#FFFFFF",
-    marginBottom: 12,
   },
   callAsLabel: {
     fontSize: 13,
@@ -606,11 +707,9 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
   numberDisplay: {
-  width: "100%",
-  paddingVertical: 10,
-  alignItems: "center",
-  marginTop: 12,
-  marginBottom: 12,
+    width: "100%",
+    paddingVertical: 10,
+    alignItems: "center",
   },
   numberText: {
     fontSize: 32,
@@ -619,55 +718,49 @@ const styles = StyleSheet.create({
     fontFamily: "poppins-bold",
     color: "#111827",
   },
+  padSection: {
+    gap: 20,
+    alignItems: "center",
+  },
   padGrid: {
-    marginTop: 8,
     gap: 12,
+    alignSelf: "stretch",
+    maxWidth: 360,
+    width: "100%",
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
   },
   key: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
   },
   keyLabel: {
     fontSize: 28,
     fontWeight: "600",
-    color: "#111827",
   },
   keyHint: {
     marginTop: 2,
     fontSize: 10,
     letterSpacing: 2,
-    color: "#6B7280",
   },
   actionsRow: {
-    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 24,
+    width: "100%",
+    maxWidth: 360,
   },
   actionIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
   },
   callButton: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
     backgroundColor: "#16A34A",
     alignItems: "center",
     justifyContent: "center",
@@ -683,12 +776,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 4,
     borderRadius: 12,
+    width: "100%",
   },
   resultAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
@@ -701,12 +794,10 @@ const styles = StyleSheet.create({
   resultName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
   },
   resultPhone: {
     marginTop: 2,
     fontSize: 13,
-    color: "#6B7280",
   },
   modalWrapper: {
     flex: 1,

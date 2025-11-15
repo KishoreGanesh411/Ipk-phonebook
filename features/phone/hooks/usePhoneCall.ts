@@ -40,6 +40,20 @@ const normalizePhone = (raw: string): string => {
   return cleaned.replace(/\+/g, "");
 };
 
+type RawCallEvent =
+  | string
+  | { state?: string; type?: string; phoneNumber?: string };
+
+const getCallEventState = (event: RawCallEvent | null | undefined): string | null => {
+  if (!event) {
+    return null;
+  }
+  if (typeof event === "string") {
+    return event;
+  }
+  return event.state ?? event.type ?? null;
+};
+
 const requestCallPermissions = async (): Promise<boolean> => {
   if (Platform.OS !== "android") {
     return true;
@@ -110,8 +124,9 @@ export function usePhoneCall(): UsePhoneCallReturn {
 
     const detector = new CallDetectorManager(
       (event) => {
+        const callState = getCallEventState(event);
         if (
-          event === "Disconnected" &&
+          callState === "Disconnected" &&
           isCallingRef.current === true &&
           callStartedAtRef.current != null
         ) {
@@ -188,7 +203,7 @@ export function usePhoneCall(): UsePhoneCallReturn {
         Alert.alert("Dialer", "Failed to open the phone app.");
       }
     },
-    [phoneNumber]
+    [phoneNumber, startCallRecord]
   );
 
   const closeFollowUp = useCallback(() => {

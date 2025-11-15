@@ -90,6 +90,11 @@ input BulkLeadRowInput {
   stageFilter: LeadStageFilter
 }
 
+enum CallDirection {
+  INCOMING
+  OUTGOING
+}
+
 input ChangeStageInput {
   channel: InteractionChannel
   leadId: ID!
@@ -390,6 +395,16 @@ enum LeadStatus {
   PENDING
 }
 
+input LogLeadCallInput {
+  direction: CallDirection!
+  durationSec: Int!
+  leadId: ID!
+  occurredAt: DateTime
+  outcome: InteractionOutcome
+  phoneNumber: String!
+  text: String
+}
+
 type Mutation {
   addLeadInteraction(input: LeadInteractionInput!): LeadEventEntity!
   addLeadNote(input: LeadNoteInput!): LeadEventEntity!
@@ -405,6 +420,7 @@ type Mutation {
   createUser(input: CreateUserInput!): CreateUserPayload!
   generatePasswordResetLink(email: String!): String!
   inviteRm(input: InviteRmInput!): InviteRmPayload!
+  logLeadCall(input: LogLeadCallInput!): LeadEventEntity!
   makeAdmin(id: ID!): UserEntity!
   markPrimaryLeadPhone(phoneId: ID!): [LeadPhoneEntity!]!
   reassignLead(input: ReassignLeadInput!): IpkLeaddEntity!

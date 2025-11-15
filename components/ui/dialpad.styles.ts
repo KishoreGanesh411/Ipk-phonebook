@@ -56,6 +56,7 @@ export const dpStyles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 16,
     alignItems: "center",
+    maxWidth: 360,
   },
   numberTextFit: {
     textAlign: "center",

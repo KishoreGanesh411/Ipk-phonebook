@@ -66,7 +66,13 @@ export const HomeDashboardScreen = () => {
   const styles = makeStyles(theme);
   const { width } = useWindowDimensions();
   const user = useAuthStore((s) => s.user);
-  const phoneCall = usePhoneCall();
+  const {
+    startCall,
+    isFollowUpOpen,
+    callDurationSeconds,
+    activeLead,
+    closeFollowUp,
+  } = usePhoneCall();
   const router = useRouter();
 
   const displayName = user?.name ?? "IPK Wealth";
@@ -124,7 +130,7 @@ export const HomeDashboardScreen = () => {
 
   const placeCall = async (lead: LeadLite) => {
     if (!lead.phone) return;
-    await phoneCall.startCall({
+    await startCall({
       leadId: lead.id,
       leadName: lead.name ?? undefined,
       phone: lead.phone,
@@ -309,23 +315,23 @@ export const HomeDashboardScreen = () => {
             );
           })()}
         </View>
+      </ScrollView>
 
-                {/* Lead detail sheet */}
-                <LeadDetailSheet
-                  leadId={detailId}
-                  visible={sheetVisible}
-                  onClose={() => setSheetVisible(false)}
-                />
-              </ScrollView>
-              <CallFollowUpModal
-                visible={phoneCall.isFollowUpOpen}
-                durationSeconds={phoneCall.callDurationSeconds ?? 0}
-                lead={phoneCall.activeLead}
-                onClose={phoneCall.closeFollowUp}
-              />
-            </SafeAreaView>
-          );
-        };
+      <LeadDetailSheet
+        leadId={detailId}
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+      />
+
+      <CallFollowUpModal
+        visible={isFollowUpOpen}
+        durationSeconds={callDurationSeconds ?? 0}
+        lead={activeLead}
+        onClose={closeFollowUp}
+      />
+    </SafeAreaView>
+  );
+};
 
 const makeStyles = (theme: ReturnType<typeof useTheme>) =>
   StyleSheet.create({
