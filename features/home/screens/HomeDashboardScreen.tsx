@@ -4,7 +4,6 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { ComponentProps, useMemo, useState } from "react";
 import {
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,7 +20,8 @@ import { useTheme } from "@/core/theme/ThemeProvider";
 import { humanizeEnum } from "@/core/utils/format";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import LeadDetailSheet from "@/features/leads/screens/LeadDetailSheet";
-import { useCallStore } from "@/features/phone/store/call.store";
+import CallFollowUpModal from "@/features/phone/components/CallFollowUpModal";
+import { usePhoneCall } from "@/features/phone/hooks/usePhoneCall";
 
 const quickActions: {
   id: string;
@@ -66,7 +66,7 @@ export const HomeDashboardScreen = () => {
   const styles = makeStyles(theme);
   const { width } = useWindowDimensions();
   const user = useAuthStore((s) => s.user);
-  const startCall = useCallStore((s) => s.startCall);
+  const phoneCall = usePhoneCall();
   const router = useRouter();
 
   const displayName = user?.name ?? "IPK Wealth";
@@ -122,15 +122,13 @@ export const HomeDashboardScreen = () => {
     setSheetVisible(true);
   };
 
-  const placeCall = async (phone?: string | null) => {
-    if (!phone) return;
-    startCall(phone);
-    const normalized = String(phone).replace(/\s|[-()]/g, "");
-    const url = `tel:${normalized}`;
-    try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) await Linking.openURL(url);
-    } catch {}
+  const placeCall = async (lead: LeadLite) => {
+    if (!lead.phone) return;
+    await phoneCall.startCall({
+      leadId: lead.id,
+      leadName: lead.name ?? undefined,
+      phone: lead.phone,
+    });
   };
 
   return (
@@ -289,7 +287,7 @@ export const HomeDashboardScreen = () => {
                         <View style={{ alignItems: "flex-end" }}>
                           <Text size="sm" tone="muted">{agingDays(lead.createdAt)}d</Text>
                           <Pressable
-                            onPress={() => placeCall(lead.phone)}
+                            onPress={() => placeCall(lead)}
                             style={{
                               marginTop: 6,
                               backgroundColor: theme.colors.success,
@@ -319,6 +317,12 @@ export const HomeDashboardScreen = () => {
                   onClose={() => setSheetVisible(false)}
                 />
               </ScrollView>
+              <CallFollowUpModal
+                visible={phoneCall.isFollowUpOpen}
+                durationSeconds={phoneCall.callDurationSeconds ?? 0}
+                lead={phoneCall.activeLead}
+                onClose={phoneCall.closeFollowUp}
+              />
             </SafeAreaView>
           );
         };
