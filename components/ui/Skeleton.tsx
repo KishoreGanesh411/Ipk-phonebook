@@ -1,5 +1,5 @@
 import { PropsWithChildren } from "react";
-import { Animated, Easing, StyleSheet, View, ViewStyle } from "react-native";
+import { Animated, Easing, StyleSheet, ViewStyle } from "react-native";
 
 import { useTheme } from "@/core/theme/ThemeProvider";
 

@@ -1,4 +1,4 @@
-diff --git a/node_modules/react-native-call-detection/android/build.gradle b/node_modules/react-native-call-detection/android/build.gradle
+﻿diff --git a/node_modules/react-native-call-detection/android/build.gradle b/node_modules/react-native-call-detection/android/build.gradle
 index 8903c5f..e92452d 100644
 --- a/node_modules/react-native-call-detection/android/build.gradle
 +++ b/node_modules/react-native-call-detection/android/build.gradle
@@ -46,3 +46,160 @@ index 8903c5f..e92452d 100644
 +    implementation 'androidx.appcompat:appcompat:1.7.0'
 +    implementation "com.facebook.react:react-native:${safeExtGet('reactNativeVersion', '+')}"
  }
+diff --git a/node_modules/react-native-call-detection/index.js b/node_modules/react-native-call-detection/index.js
+index 005c3df..25185df 100644
+--- a/node_modules/react-native-call-detection/index.js
++++ b/node_modules/react-native-call-detection/index.js
+@@ -4,19 +4,16 @@
+ import {
+   NativeModules,
+   NativeEventEmitter,
++  DeviceEventEmitter,
+   Platform,
+-  PermissionsAndroid
++  PermissionsAndroid,
+ } from 'react-native'
+ export const permissionDenied = 'PERMISSION DENIED'
+ 
+-const BatchedBridge = require('react-native/Libraries/BatchedBridge/BatchedBridge')
+-
++const EVENT_NAME = 'PhoneCallStateUpdate'
+ const NativeCallDetector = NativeModules.CallDetectionManager
+ const NativeCallDetectorAndroid = NativeModules.CallDetectionManagerAndroid
+ 
+-var CallStateUpdateActionModule = require('./CallStateUpdateActionModule')
+-BatchedBridge.registerCallableModule('CallStateUpdateActionModule', CallStateUpdateActionModule)
+-
+ const requestPermissionsAndroid = async (permissionMessage) => {
+       await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE)
+       .then(async (gotPermission) => gotPermission
+@@ -37,32 +34,36 @@ class CallDetectorManager {
+         this.callback = callback
+         if (Platform.OS === 'ios') {
+             NativeCallDetector && NativeCallDetector.startListener()
+-            this.subscription = new NativeEventEmitter(NativeCallDetector)
+-            this.subscription.addListener('PhoneCallStateUpdate', callback);
+-        }
+-        else {
+-            if(NativeCallDetectorAndroid) {
+-              if(readPhoneNumberAndroid) {
+-                requestPermissionsAndroid(permissionMessage)
+-                  .then((permissionGranted) => {
+-                    if (!permissionGranted) {
+-                      permissionDeniedCallback(permissionDenied)
+-                    }
+-                  })
+-                  .catch(permissionDeniedCallback)
+-              }
+-              NativeCallDetectorAndroid.startListener();
++            const emitter = new NativeEventEmitter(NativeCallDetector)
++            this.subscription = emitter.addListener(EVENT_NAME, callback);
++        } else if (NativeCallDetectorAndroid) {
++          if(readPhoneNumberAndroid) {
++            requestPermissionsAndroid(permissionMessage)
++              .then((permissionGranted) => {
++                if (!permissionGranted) {
++                  permissionDeniedCallback(permissionDenied)
++                }
++              })
++              .catch(permissionDeniedCallback)
++          }
++          NativeCallDetectorAndroid.startListener();
++          this.subscription = DeviceEventEmitter.addListener(EVENT_NAME, (event) => {
++            if (typeof event === 'string') {
++              callback(event)
++              return
++            }
++            if (event && typeof event === 'object') {
++              callback(event.state ?? event.type ?? event, event.phoneNumber)
+             }
+-            CallStateUpdateActionModule.callback = callback
++          });
+         }
+     }
+ 
+     dispose() {
+     	NativeCallDetector && NativeCallDetector.stopListener()
+     	NativeCallDetectorAndroid && NativeCallDetectorAndroid.stopListener()
+-        CallStateUpdateActionModule.callback = undefined
+       if(this.subscription) {
+-          this.subscription.removeAllListeners('PhoneCallStateUpdate');
++          this.subscription.remove();
+           this.subscription = undefined
+       }
+     }
+diff --git a/node_modules/react-native-call-detection/android/src/main/java/com/pritesh/calldetection/CallDetectionManagerModule.java b/node_modules/react-native-call-detection/android/src/main/java/com/pritesh/calldetection/CallDetectionManagerModule.java
+index d480f0f..1d27d56 100644
+--- a/node_modules/react-native-call-detection/android/src/main/java/com/pritesh/calldetection/CallDetectionManagerModule.java
++++ b/node_modules/react-native-call-detection/android/src/main/java/com/pritesh/calldetection/CallDetectionManagerModule.java
+@@ -8,9 +8,12 @@ import android.telephony.PhoneStateListener;
+ import android.telephony.TelephonyManager;
+ import android.util.Log;
+ 
++import com.facebook.react.bridge.Arguments;
+ import com.facebook.react.bridge.ReactApplicationContext;
+ import com.facebook.react.bridge.ReactContextBaseJavaModule;
+ import com.facebook.react.bridge.ReactMethod;
++import com.facebook.react.bridge.WritableMap;
++import com.facebook.react.modules.core.DeviceEventManagerModule;
+ 
+ import java.util.HashMap;
+ import java.util.Map;
+@@ -24,7 +27,6 @@ public class CallDetectionManagerModule
+     private boolean wasAppInRinging = false;
+     private ReactApplicationContext reactContext;
+     private TelephonyManager telephonyManager;
+-    private CallStateUpdateActionModule jsModule = null;
+     private CallDetectionPhoneStateListener callDetectionPhoneStateListener;
+     private Activity activity = null;
+ 
+@@ -112,15 +114,14 @@ public class CallDetectionManagerModule
+ 
+     @Override
+     public void phoneCallStateUpdated(int state, String phoneNumber) {
+-        jsModule = this.reactContext.getJSModule(CallStateUpdateActionModule.class);
+ 
+         switch (state) {
+             //Hangup
+             case TelephonyManager.CALL_STATE_IDLE:
+                 if(wasAppInOffHook == true) { // if there was an ongoing call and the call state switches to idle, the call must have gotten disconnected
+-                    jsModule.callStateUpdated("Disconnected", phoneNumber);
++                    emitCallState("Disconnected", phoneNumber);
+                 } else if(wasAppInRinging == true) { // if the phone was ringing but there was no actual ongoing call, it must have gotten missed
+-                    jsModule.callStateUpdated("Missed", phoneNumber);
++                    emitCallState("Missed", phoneNumber);
+                 }
+ 
+                 //reset device state
+@@ -131,14 +132,28 @@ public class CallDetectionManagerModule
+             case TelephonyManager.CALL_STATE_OFFHOOK:
+                 //Device call state: Off-hook. At least one call exists that is dialing, active, or on hold, and no calls are ringing or waiting.
+                 wasAppInOffHook = true;
+-                jsModule.callStateUpdated("Offhook", phoneNumber);
++                emitCallState("Offhook", phoneNumber);
+                 break;
+             //Incoming
+             case TelephonyManager.CALL_STATE_RINGING:
+                 // Device call state: Ringing. A new call arrived and is ringing or waiting. In the latter case, another call is already active.
+                 wasAppInRinging = true;
+-                jsModule.callStateUpdated("Incoming", phoneNumber);
++                emitCallState("Incoming", phoneNumber);
+                 break;
+         }
+     }
++
++    private void emitCallState(String state, String phoneNumber) {
++        if (reactContext == null || !reactContext.hasActiveCatalystInstance()) {
++            return;
++        }
++        WritableMap event = Arguments.createMap();
++        event.putString("state", state);
++        if (phoneNumber != null) {
++            event.putString("phoneNumber", phoneNumber);
++        }
++        reactContext
++                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
++                .emit("PhoneCallStateUpdate", event);
++    }
+ }
+

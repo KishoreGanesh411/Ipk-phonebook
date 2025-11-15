@@ -50,14 +50,15 @@ firestore.rules
 storage.rules
 google-services.json
 GoogleService-Info.plist
-
+firebaseConfig.js
+/config/firebase/
 # Environment variables
 .env
 .env.local
 .env.production
 .env.development
 package-lock.json
-
+app.json
 # Build caches
 .expo-shared/
 .gradle/
@@ -67,3 +68,4 @@ build/
 .vscode/
 .idea/
 *.iml
+package-lock.json

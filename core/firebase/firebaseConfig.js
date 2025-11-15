@@ -1,8 +1,9 @@
 // firebaseConfig.js
 import { initializeApp } from 'firebase/app';
 // (Optionally import other Firebase services you plan to use, e.g. auth)
-import { getAuth } from 'firebase/auth';
+import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
 // Your web app's Firebase configuration:
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'; // Import the storage module
 const firebaseConfig = {
   apiKey: "AIzaSyDSh9ccZviLr1VIfhVD261jyK9_0si0f4g",
   authDomain: "ipkwealth-crm.firebaseapp.com",
@@ -13,6 +14,12 @@ const firebaseConfig = {
   measurementId: "G-NES6XWW4YC"
 };
 
-// Initialize Firebase
-export const firebaseApp = initializeApp(firebaseConfig);
-export const auth = getAuth(firebaseApp);
+
+const app = initializeApp(firebaseConfig);
+
+// FIX: Initialize Auth with AsyncStorage Persistence
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
+
+export { app, auth };

@@ -1,8 +1,19 @@
 import { useQuery } from '@apollo/client/react';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import React, { useMemo, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LoadingState } from '@/components/feedback/LoadingState';
@@ -11,12 +22,40 @@ import { Text } from '@/components/ui/Text';
 import { LEAD_BASIC, LEAD_DETAIL_WITH_TIMELINE } from '@/core/graphql/queries';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { updateLeadAfterCall } from '@/features/leads/services/interactions.service';
+import { usePhoneCall } from '@/features/phone/hooks/usePhoneCall';
 
 type Props = {
   leadId: string | null;
   visible: boolean;
   onClose: () => void;
 };
+
+const CLIENT_STAGE_OPTIONS = [
+  'NEW_LEAD',
+  'FIRST_TALK_DONE',
+  'FOLLOWING_UP',
+  'CLIENT_INTERESTED',
+  'ACCOUNT_OPENED',
+  'NO_RESPONSE_DORMANT',
+  'NOT_INTERESTED_DORMANT',
+  'RISKY_CLIENT_DORMANT',
+  'HIBERNATED',
+] as const;
+
+type ClientStageOption = (typeof CLIENT_STAGE_OPTIONS)[number];
+
+const STAGE_FILTER_OPTIONS = [
+  null,
+  'NEED_CLARIFICATION',
+  'FUTURE_INTERESTED',
+  'NOT_INTERESTED',
+  'NOT_ELIGIBLE',
+  'HIGH_PRIORITY',
+  'LOW_PRIORITY',
+  'ON_PROCESS',
+] as const;
+
+type StageFilterOption = (typeof STAGE_FILTER_OPTIONS)[number];
 
 export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
   const theme = useTheme();
@@ -54,21 +93,52 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
     }
   }, [visible, leadId]);
 
+  React.useEffect(() => {
+    if (!lead) return;
+    if (lead.clientStage && (CLIENT_STAGE_OPTIONS as readonly string[]).includes(lead.clientStage)) {
+      setSelectedStage(lead.clientStage as ClientStageOption);
+    } else {
+      setSelectedStage('NEW_LEAD');
+    }
+
+    const nextFilter = (lead.stageFilter ?? null) as StageFilterOption;
+    if (nextFilter === null || (STAGE_FILTER_OPTIONS as readonly (string | null)[]).includes(nextFilter)) {
+      setSelectedStageFilter(nextFilter);
+    } else {
+      setSelectedStageFilter(null);
+    }
+  }, [lead?.id, lead?.clientStage, lead?.stageFilter]);
+
+  React.useEffect(() => {
+    if (isFollowUpOpen) {
+      setChannel('CALL');
+      setCallEndedAt(new Date().toISOString());
+      setLogOpen(true);
+    }
+  }, [isFollowUpOpen]);
+
   const lead = data?.leadDetailWithTimeline ?? basicData?.lead;
   const title = 'Lead identity';
 
+  const {
+    startCall,
+    isFollowUpOpen,
+    callDurationSeconds,
+    closeFollowUp,
+  } = usePhoneCall();
+  const [callStartedAt, setCallStartedAt] = useState<string | null>(null);
+  const [callEndedAt, setCallEndedAt] = useState<string | null>(null);
+  const [selectedStage, setSelectedStage] = useState<ClientStageOption>('NEW_LEAD');
+  const [selectedStageFilter, setSelectedStageFilter] = useState<StageFilterOption>(null);
+  const [stagePickerOpen, setStagePickerOpen] = useState(false);
+  const [stageFilterPickerOpen, setStageFilterPickerOpen] = useState(false);
+  const [stageSaving, setStageSaving] = useState(false);
+  const [stageFilterSaving, setStageFilterSaving] = useState(false);
   const primaryPhone = useMemo(() => {
     if (!lead?.phones?.length) return lead?.phone;
     const primary = lead.phones.find((p: any) => p.isPrimary) ?? lead.phones[0];
     return primary?.number ?? lead?.phone;
   }, [lead]);
-
-  const openTel = async (phone?: string | null) => {
-    if (!phone) return;
-    const normalized = (phone || '').replace(/\s|[-()]/g, '');
-    const url = `tel:${normalized}`;
-    if (await Linking.canOpenURL(url)) Linking.openURL(url);
-  };
 
   const openWhatsApp = async (phone?: string | null) => {
     if (!phone) return;
@@ -88,6 +158,107 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
     await Clipboard.setStringAsync(value);
   };
 
+  const handleStartCall = useCallback(async () => {
+    if (!lead || !primaryPhone) {
+      Alert.alert('Dialer', 'No phone number available for this lead.');
+      return;
+    }
+    setChannel('CALL');
+    const startedAtIso = new Date().toISOString();
+    setCallStartedAt(startedAtIso);
+    setCallEndedAt(null);
+    try {
+      await startCall({
+        leadId: lead.id,
+        leadName: lead.name ?? undefined,
+        phone: primaryPhone,
+      });
+    } catch (err) {
+      console.error('Failed to open dialer', err);
+      setCallStartedAt(null);
+      Alert.alert('Dialer', 'Failed to open the phone app.');
+    }
+  }, [lead, primaryPhone, startCall]);
+
+  const openManualLog = useCallback(() => {
+    setCallStartedAt(null);
+    setCallEndedAt(null);
+    setChannel('CALL');
+    setLogOpen(true);
+  }, []);
+
+  const closeLogModal = useCallback(() => {
+    setLogOpen(false);
+    setChannel('CALL');
+    setNote('');
+    setProductExplained(true);
+    setNextFollowUpAt(undefined);
+    setCallStartedAt(null);
+    setCallEndedAt(null);
+    closeFollowUp();
+  }, [closeFollowUp]);
+
+  const handleStageSelect = useCallback(
+    async (value: ClientStageOption) => {
+      if (!leadId) return;
+      if (selectedStage === value) {
+        setStagePickerOpen(false);
+        return;
+      }
+      try {
+        setStageSaving(true);
+        await updateLeadAfterCall({
+          leadId,
+          channel: 'OTHER',
+          stage: value,
+          stageFilter: selectedStageFilter ?? null,
+          note: `Stage changed to ${slugToLabel(value)}`,
+        });
+        setSelectedStage(value);
+        setStagePickerOpen(false);
+        refetch();
+      } catch (err) {
+        console.error('Failed to update stage', err);
+        Alert.alert('Lead stage', 'Unable to update the stage. Please try again.');
+      } finally {
+        setStageSaving(false);
+      }
+    },
+    [leadId, refetch, selectedStage, selectedStageFilter]
+  );
+
+  const handleStageFilterSelect = useCallback(
+    async (value: StageFilterOption) => {
+      if (!leadId) return;
+      if (selectedStageFilter === value) {
+        setStageFilterPickerOpen(false);
+        return;
+      }
+      try {
+        setStageFilterSaving(true);
+        await updateLeadAfterCall({
+          leadId,
+          channel: 'OTHER',
+          stage: selectedStage,
+          stageFilter: value ?? null,
+          note:
+            value != null
+              ? `Stage filter set to ${slugToLabel(value)}`
+              : 'Stage filter cleared',
+        });
+        setSelectedStageFilter(value);
+        setStageFilterPickerOpen(false);
+        refetch();
+      } catch (err) {
+        console.error('Failed to update stage filter', err);
+        Alert.alert('Lead filter', 'Unable to update the stage filter. Please try again.');
+      } finally {
+        setStageFilterSaving(false);
+      }
+    },
+    [leadId, refetch, selectedStage, selectedStageFilter]
+  );
+
   // Interaction state
   const [logOpen, setLogOpen] = useState(false);
   const [channel, setChannel] = useState<'CALL' | 'WHATSAPP' | 'EMAIL' | 'SMS' | 'OTHER'>('CALL');
@@ -100,19 +271,22 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
     if (!leadId || !note.trim()) return;
     setSaving(true);
     try {
+      const endedAt = callEndedAt ?? (callStartedAt ? new Date().toISOString() : null);
       await updateLeadAfterCall({
         leadId: leadId,
         channel,
         note: note.trim(),
         productExplained,
         nextFollowUpAt: nextFollowUpAt ?? null,
-        stage: 'CLIENT_INTERESTED',
+        stage: selectedStage,
+        stageFilter: selectedStageFilter ?? null,
+        callStartedAt,
+        callEndedAt: endedAt,
+        durationSeconds: callDurationSeconds ?? null,
+        saveRemark: true,
       });
-      setLogOpen(false);
-      setNote('');
-      setProductExplained(true);
-      setNextFollowUpAt(undefined);
       refetch();
+      closeLogModal();
     } finally {
       setSaving(false);
     }
@@ -160,64 +334,87 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                 {/* Quick facts */}
                 <Card style={styles.card}>
                   <Text weight="semibold" style={styles.sectionTitle}>Quick info</Text>
-                  <Meta line1="Full name" line2={lead.name || '-'} />
+                  <Meta line1="Name" line2={lead.name || '-'} />
                   <View style={styles.row}>
-                    <MaterialIcons name="phone" size={18} color={theme.colors.primary} />
+                    <MaterialIcons name="phone" size={16} color={theme.colors.primary} />
                     <Text style={styles.rowText}>{primaryPhone || 'Not captured'}</Text>
                     <View style={styles.rowActions}>
-                      <Pressable onPress={() => openTel(primaryPhone)} style={styles.iconBtn}>
-                        <MaterialIcons name="call" size={18} color="#fff" />
+                      <Pressable onPress={handleStartCall} style={styles.iconBtn}>
+                        <MaterialIcons name="call" size={16} color="#fff" />
                       </Pressable>
                       <Pressable onPress={() => openWhatsApp(primaryPhone)} style={styles.iconBtn}>
-                        <MaterialCommunityIcons name="whatsapp" size={18} color="#fff" />
+                        <MaterialCommunityIcons name="whatsapp" size={16} color="#fff" />
                       </Pressable>
                       <Pressable onPress={() => copy(primaryPhone)} style={[styles.iconBtn, { backgroundColor: theme.colors.muted }]}>
-                        <MaterialIcons name="content-copy" size={16} color="#fff" />
+                        <MaterialIcons name="content-copy" size={14} color="#fff" />
                       </Pressable>
                     </View>
                   </View>
 
                   {lead.email ? (
                     <View style={styles.row}>
-                      <MaterialIcons name="email" size={18} color={theme.colors.primary} />
+                      <MaterialIcons name="email" size={16} color={theme.colors.primary} />
                       <Text style={styles.rowText}>{lead.email}</Text>
                       <View style={styles.rowActions}>
                         <Pressable onPress={() => openEmail(lead.email)} style={styles.iconBtn}>
-                          <MaterialIcons name="send" size={18} color="#fff" />
+                          <MaterialIcons name="send" size={16} color="#fff" />
                         </Pressable>
                         <Pressable onPress={() => copy(lead.email)} style={[styles.iconBtn, { backgroundColor: theme.colors.muted }]}>
-                          <MaterialIcons name="content-copy" size={16} color="#fff" />
+                          <MaterialIcons name="content-copy" size={14} color="#fff" />
                         </Pressable>
                       </View>
                     </View>
                   ) : null}
 
-                  {lead.location ? (
-                    <View style={styles.row}>
-                      <MaterialIcons name="location-on" size={18} color={theme.colors.primary} />
-                      <Text style={styles.rowText}>{lead.location}</Text>
-                    </View>
-                  ) : null}
-                  <View style={[styles.row, { marginTop: 6 }]}> 
-                    <MaterialIcons name="event" size={18} color={theme.colors.primary} />
+                  <View style={[styles.row, { marginTop: 6 }]}>
+                    <MaterialIcons name="event" size={16} color={theme.colors.primary} />
                     <Text style={styles.rowText}>
                       Entered on: {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : '-'}
                     </Text>
                   </View>
-                  <View style={[styles.row, { marginTop: 2 }]}> 
-                    <MaterialIcons name="hourglass-bottom" size={18} color={theme.colors.primary} />
+                  <View style={[styles.row, { marginTop: 2 }]}>
+                    <MaterialIcons name="hourglass-bottom" size={16} color={theme.colors.primary} />
                     <Text style={styles.rowText}>Aging days: {lead.createdAt ? Math.max(0, Math.floor((Date.now() - new Date(lead.createdAt).getTime()) / 86_400_000)) : '-'}</Text>
                   </View>
+                  <Meta line1="Lead source" line2={lead.leadSource || '-'} />
+                  <Meta line1="Gender" line2={lead.gender ? slugToLabel(lead.gender) : '-'} />
                 </Card>
 
                 {/* Meta */}
                 <Card style={styles.card}>
                   <Text weight="semibold" style={styles.sectionTitle}>Lead details</Text>
                   <Meta line1="Lead code" line2={lead.leadCode || '-'} />
-                  <Meta line1="Stage" line2={slugToLabel(lead.clientStage)} />
-                  <Meta line1="Status" line2={lead.status} />
-                  <Meta line1="Lead source" line2={lead.leadSource || '-'} />
-                  <Meta line1="Gender" line2={lead.gender ? slugToLabel(lead.gender) : '-'} />
+                  <View style={styles.detailGrid}>
+                    <View style={styles.detailBox}>
+                      <Text size="sm" tone="muted">Stage</Text>
+                      <Pressable
+                        onPress={() => setStagePickerOpen(true)}
+                        style={styles.detailValue}
+                        disabled={stageSaving}
+                      >
+                        <Text weight="semibold">{slugToLabel(selectedStage)}</Text>
+                        <MaterialIcons name="edit" size={16} color={theme.colors.primary} />
+                      </Pressable>
+                      {stageSaving ? (
+                        <Text size="xs" tone="muted" style={{ marginTop: 4 }}>Updating...</Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.detailBox}>
+                      <Text size="sm" tone="muted">Status filter</Text>
+                      <Pressable
+                        onPress={() => setStageFilterPickerOpen(true)}
+                        style={styles.detailValue}
+                        disabled={stageFilterSaving}
+                      >
+                        <Text weight="semibold">{selectedStageFilter ? slugToLabel(selectedStageFilter) : 'Not set'}</Text>
+                        <MaterialIcons name="edit" size={16} color={theme.colors.primary} />
+                      </Pressable>
+                      {stageFilterSaving ? (
+                        <Text size="xs" tone="muted" style={{ marginTop: 4 }}>Updating...</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Meta line1="Lead status" line2={lead.status ? slugToLabel(lead.status) : '-'} />
                   {lead.referralName ? <Meta line1="Referral" line2={lead.referralName} /> : null}
                   {typeof lead.contactAttempts === 'number' ? (
                     <Meta line1="Contact attempts" line2={String(lead.contactAttempts)} />
@@ -286,11 +483,11 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                   <MaterialIcons name="refresh" size={18} color="#fff" />
                   <Text weight="bold" size="sm" style={{ color: '#fff', marginLeft: 6 }}>Refresh</Text>
                 </Pressable>
-                <Pressable onPress={() => openTel(primaryPhone)} style={[styles.footerBtn, { backgroundColor: theme.colors.success }]}>
+                <Pressable onPress={handleStartCall} style={[styles.footerBtn, { backgroundColor: theme.colors.success }]}>
                   <MaterialIcons name="call" size={18} color="#fff" />
                   <Text weight="bold" size="sm" style={{ color: '#fff', marginLeft: 6 }}>Call</Text>
                 </Pressable>
-                <Pressable onPress={() => setLogOpen(true)} style={styles.footerBtn}>
+                <Pressable onPress={openManualLog} style={styles.footerBtn}>
                   <MaterialIcons name="note-add" size={18} color="#fff" />
                   <Text weight="bold" size="sm" style={{ color: '#fff', marginLeft: 6 }}>Log Interaction</Text>
                 </Pressable>
@@ -301,12 +498,12 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
       </Modal>
 
       {/* Log Interaction Modal */}
-      <Modal visible={logOpen} animationType="slide" transparent onRequestClose={() => setLogOpen(false)}>
+      <Modal visible={logOpen} animationType="slide" transparent onRequestClose={closeLogModal}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, { maxHeight: '80%' }] }>
             <View style={styles.header}>
               <Text size="lg" weight="bold">Log Interaction</Text>
-              <Pressable onPress={() => setLogOpen(false)} style={styles.closeBtn} accessibilityLabel="Close">
+              <Pressable onPress={closeLogModal} style={styles.closeBtn} accessibilityLabel="Close">
                 <MaterialIcons name="close" size={22} color={theme.colors.text} />
               </Pressable>
             </View>
@@ -316,6 +513,53 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                 {(['CALL','WHATSAPP','EMAIL','SMS','OTHER'] as const).map((c) => (
                   <Pressable key={c} onPress={() => setChannel(c)} style={[styles.pill, channel===c && styles.pillActive]}>
                     <Text size="sm">{c}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {(callStartedAt || callEndedAt || callDurationSeconds != null) ? (
+                <View style={{ marginTop: 12 }}>
+                  <Text weight="semibold">Call summary</Text>
+                  {callStartedAt ? (
+                    <Text size="sm" tone="muted" style={{ marginTop: 4 }}>
+                      Started: {new Date(callStartedAt).toLocaleString()}
+                    </Text>
+                  ) : null}
+                  {callEndedAt ? (
+                    <Text size="sm" tone="muted" style={{ marginTop: 2 }}>
+                      Ended: {new Date(callEndedAt).toLocaleString()}
+                    </Text>
+                  ) : null}
+                  {callDurationSeconds != null ? (
+                    <Text size="sm" tone="muted" style={{ marginTop: 2 }}>
+                      Duration: {Math.max(1, Math.round(callDurationSeconds))} sec
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              <Text weight="semibold" style={{ marginTop: 14 }}>Lead stage</Text>
+              <View style={styles.pillWrap}>
+                {CLIENT_STAGE_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option}
+                    onPress={() => setSelectedStage(option)}
+                    style={[styles.pill, selectedStage === option && styles.pillActive]}
+                  >
+                    <Text size="sm">{slugToLabel(option)}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text weight="semibold" style={{ marginTop: 14 }}>Status filter</Text>
+              <View style={styles.pillWrap}>
+                {STAGE_FILTER_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option ?? 'none'}
+                    onPress={() => setSelectedStageFilter(option)}
+                    style={[styles.pill, selectedStageFilter === option && styles.pillActive]}
+                  >
+                    <Text size="sm">{option ? slugToLabel(option) : 'Not set'}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -345,7 +589,7 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
               </View>
 
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                <Pressable onPress={() => setLogOpen(false)} style={styles.footerBtn}>
+                <Pressable onPress={closeLogModal} style={styles.footerBtn}>
                   <Text weight="bold" size="sm" style={{ color: '#fff' }}>Cancel</Text>
                 </Pressable>
                 <Pressable onPress={submitInteraction} disabled={saving || !note.trim()} style={[styles.footerBtn, saving && { opacity: 0.7 }]}>
@@ -356,12 +600,69 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={stagePickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStagePickerOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setStagePickerOpen(false)} />
+          <View style={styles.optionCard}>
+            <Text weight="semibold" style={{ marginBottom: 8 }}>Select stage</Text>
+            {CLIENT_STAGE_OPTIONS.map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => handleStageSelect(option)}
+                disabled={stageSaving}
+                style={styles.optionRow}
+              >
+                <Text>{slugToLabel(option)}</Text>
+                {selectedStage === option ? (
+                  <MaterialIcons name="check" size={18} color={theme.colors.primary} />
+                ) : null}
+              </Pressable>
+            ))}
+            {stageSaving ? <ActivityIndicator style={{ marginTop: 8 }} color={theme.colors.primary} /> : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={stageFilterPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStageFilterPickerOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setStageFilterPickerOpen(false)} />
+          <View style={styles.optionCard}>
+            <Text weight="semibold" style={{ marginBottom: 8 }}>Select status filter</Text>
+            {STAGE_FILTER_OPTIONS.map((option) => (
+              <Pressable
+                key={option ?? 'none'}
+                onPress={() => handleStageFilterSelect(option)}
+                disabled={stageFilterSaving}
+                style={styles.optionRow}
+              >
+                <Text>{option ? slugToLabel(option) : 'Not set'}</Text>
+                {selectedStageFilter === option ? (
+                  <MaterialIcons name="check" size={18} color={theme.colors.primary} />
+                ) : null}
+              </Pressable>
+            ))}
+            {stageFilterSaving ? <ActivityIndicator style={{ marginTop: 8 }} color={theme.colors.primary} /> : null}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
 
-function slugToLabel(stage?: string | null) {
-  const s = (stage ?? 'NEW_LEAD').split('_');
+function slugToLabel(stage?: string | null, fallback = '-') {
+  if (!stage) return fallback;
+  const s = stage.split('_');
   return s.map(x => x.charAt(0) + x.slice(1).toLowerCase()).join(' ');
 }
 
@@ -418,7 +719,30 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) =>
     rowActions: { flexDirection: 'row', gap: 8 },
     iconBtn: {
       backgroundColor: theme.colors.primary,
-      paddingHorizontal: 10, paddingVertical: 8, borderRadius: 14,
+      paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12,
+    },
+    detailGrid: {
+      marginTop: theme.spacing.sm,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.sm,
+    },
+    detailBox: {
+      flex: 1,
+      minWidth: 160,
+      gap: 4,
+    },
+    detailValue: {
+      marginTop: 6,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.colors.card,
     },
     timelineItem: {
       flexDirection: 'row', gap: 12, marginTop: 10,
@@ -451,5 +775,34 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) =>
     pillActive: {
       borderColor: theme.colors.primary,
       backgroundColor: 'rgba(70,95,255,0.1)',
+    },
+    pillWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.xs,
+      marginTop: theme.spacing.xs,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(15,23,42,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: theme.spacing.lg,
+    },
+    optionCard: {
+      width: '100%',
+      maxWidth: 360,
+      borderRadius: 16,
+      backgroundColor: theme.colors.background,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      padding: theme.spacing.md,
+      gap: 6,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 10,
     },
   });

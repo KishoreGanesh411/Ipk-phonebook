@@ -82,6 +82,7 @@ export const LEAD_DETAIL_WITH_TIMELINE = gql`
       leadCode
       status
       clientStage
+      stageFilter
       name
       firstName
       lastName
@@ -130,6 +131,7 @@ export const LEAD_BASIC = gql`
       leadCode
       status
       clientStage
+      stageFilter
       name
       phone
       email
@@ -164,9 +166,10 @@ export const UPDATE_LEAD_DETAILS_AFTER_CALL = gql`
     $leadId: ID!
     $channel: InteractionChannel!
     $nextFollowUpAt: DateTime
-    $note: String!
-    $productExplained: Boolean!
+    $note: String
+    $productExplained: Boolean
     $stage: ClientStage!
+    $stageFilter: LeadStageFilter
   ) {
     changeStage(
       input: {
@@ -176,6 +179,7 @@ export const UPDATE_LEAD_DETAILS_AFTER_CALL = gql`
         note: $note
         productExplained: $productExplained
         stage: $stage
+        stageFilter: $stageFilter
       }
     ) {
       id
@@ -184,7 +188,18 @@ export const UPDATE_LEAD_DETAILS_AFTER_CALL = gql`
       phone
       email
       clientStage
+      stageFilter
       nextActionDueAt
+      updatedAt
+    }
+  }
+`;
+
+export const UPDATE_LEAD_REMARK = gql`
+  mutation UpdateLeadRemark($leadId: ID!, $remark: String!) {
+    updateLeadRemark(input: { leadId: $leadId, remark: $remark }) {
+      id
+      remark
       updatedAt
     }
   }

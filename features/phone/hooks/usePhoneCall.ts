@@ -1,6 +1,15 @@
 ﻿// features/phone/hooks/usePhoneCall.ts
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, AppState, AppStateStatus, Linking } from "react-native";
+import {
+  Alert,
+  AppState,
+  AppStateStatus,
+  Linking,
+  PermissionsAndroid,
+  Platform,
+} from "react-native";
+import CallDetectorManager from "react-native-call-detection";
+import { useCallStore } from "@/features/phone/store/call.store";
 
 export type ActiveLead = { id: string; name?: string; phone?: string } | null;
 
@@ -31,6 +40,36 @@ const normalizePhone = (raw: string): string => {
   return cleaned.replace(/\+/g, "");
 };
 
+const requestCallPermissions = async (): Promise<boolean> => {
+  if (Platform.OS !== "android") {
+    return true;
+  }
+
+  const granted = await PermissionsAndroid.requestMultiple([
+    PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+    PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+  ]);
+
+  const hasPhoneState =
+    granted[PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE] ===
+    PermissionsAndroid.RESULTS.GRANTED;
+  const hasCallLog =
+    granted[PermissionsAndroid.PERMISSIONS.READ_CALL_LOG] ===
+    PermissionsAndroid.RESULTS.GRANTED;
+
+  if (hasPhoneState && hasCallLog) {
+    console.log("Call permissions granted");
+    return true;
+  }
+
+  console.warn("Call permissions denied", granted);
+  Alert.alert(
+    "Dialer",
+    "Call permissions are required to track call progress on Android."
+  );
+  return false;
+};
+
 export function usePhoneCall(): UsePhoneCallReturn {
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [isCalling, setIsCalling] = useState<boolean>(false);
@@ -45,6 +84,12 @@ export function usePhoneCall(): UsePhoneCallReturn {
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const isCallingRef = useRef<boolean>(isCalling);
   const callStartedAtRef = useRef<number | null>(callStartedAt);
+  const callDetectorRef = useRef<InstanceType<typeof CallDetectorManager> | null>(
+    null
+  );
+  const endCallCallback = useCallStore((state) => state.endCall);
+  const startCallRecord = useCallStore((state) => state.startCall);
+  const endCallRef = useRef(endCallCallback);
 
   useEffect(() => {
     isCallingRef.current = isCalling;
@@ -55,29 +100,45 @@ export function usePhoneCall(): UsePhoneCallReturn {
   }, [callStartedAt]);
 
   useEffect(() => {
-    const sub = AppState.addEventListener("change", (next) => {
-      const prev = appStateRef.current;
-      appStateRef.current = next;
+    endCallRef.current = endCallCallback;
+  }, [endCallCallback]);
 
-      const wasBackground = prev === "background" || prev === "inactive";
-      if (
-        wasBackground &&
-        next === "active" &&
-        isCallingRef.current === true &&
-        callStartedAtRef.current != null
-      ) {
-        const seconds = Math.max(
-          1,
-          Math.round((Date.now() - (callStartedAtRef.current as number)) / 1000)
-        );
-        setCallDurationSeconds(seconds);
-        setIsCalling(false);
-        setIsFollowUpOpen(true);
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    const detector = new CallDetectorManager(
+      (event) => {
+        if (
+          event === "Disconnected" &&
+          isCallingRef.current === true &&
+          callStartedAtRef.current != null
+        ) {
+          const seconds = Math.max(
+            1,
+            Math.round(
+              (Date.now() - (callStartedAtRef.current as number)) / 1000
+            )
+          );
+          setCallDurationSeconds(seconds);
+          setIsCalling(false);
+          setIsFollowUpOpen(true);
+          setCallStartedAt(null);
+          endCallRef.current?.();
+        }
+      },
+      false,
+      (reason) => {
+        console.warn("Call detection permission denied", reason);
       }
-    });
+    );
+
+    callDetectorRef.current = detector;
 
     return () => {
-      sub.remove();
+      callDetectorRef.current?.dispose();
+      callDetectorRef.current = null;
     };
   }, []);
 
@@ -88,6 +149,11 @@ export function usePhoneCall(): UsePhoneCallReturn {
 
       if (!normalized) {
         Alert.alert("Dialer", "Enter a phone number first");
+        return;
+      }
+
+      const permissionsGranted = await requestCallPermissions();
+      if (!permissionsGranted) {
         return;
       }
 
@@ -112,6 +178,7 @@ export function usePhoneCall(): UsePhoneCallReturn {
         setIsCalling(true);
         setCallStartedAt(Date.now());
         setCallDurationSeconds(null);
+        startCallRecord(sourceNumber);
 
         await Linking.openURL(url);
       } catch (err) {

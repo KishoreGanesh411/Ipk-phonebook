@@ -41,7 +41,7 @@ export default function RootLayout() {
     if (user && !hydrated) {
       hydrate().catch(() => {});
     }
-  }, [ready, user?.uid, hydrated, hydrate]);
+  }, [ready, user, hydrated, hydrate]);
 
   return (
     <SafeAreaProvider>
