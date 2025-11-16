@@ -4,6 +4,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -211,13 +212,23 @@ export default function CallFollowUpModal({
   return (
     <>
       <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { /* blocking via BackHandler in screen */ }}>
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 20}
+          style={styles.overlay}
+        >
           <View style={styles.card}>
             <Text style={styles.title}>Call Follow-up</Text>
             {leadLine ? <Text style={styles.subtitle}>{leadLine}</Text> : null}
             <Text style={styles.duration}>Call duration: {durationLabel} sec</Text>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={styles.scrollContent}
+            >
               <View style={styles.field}>
                 <Text style={styles.label}>Lead Stage</Text>
                 <Pressable
@@ -301,7 +312,7 @@ export default function CallFollowUpModal({
               <Text style={styles.primaryBtnText}>{saving ? "Saving..." : "Save & Continue"}</Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Stage Picker Modal */}
@@ -370,7 +381,7 @@ export default function CallFollowUpModal({
       {Platform.OS === "android" && showDatePicker && datePickerMountedRef.current && (
         <DateTimePicker
           value={nextFollowUpDate || new Date()}
-          mode="datetime"
+          mode="date"
           display="default"
           onChange={handleDateChange}
           minimumDate={new Date()}
@@ -441,6 +452,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     maxHeight: 400,
+  },
+  scrollContent: {
+    paddingBottom: 8,
   },
   title: {
     fontSize: 18,

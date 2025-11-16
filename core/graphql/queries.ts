@@ -199,7 +199,12 @@ export const UPDATE_LEAD_REMARK = gql`
   mutation UpdateLeadRemark($leadId: ID!, $remark: String!) {
     updateLeadRemark(input: { leadId: $leadId, remark: $remark }) {
       id
-      remark
+      remark {
+        at
+        by
+        byName
+        text
+      }
       updatedAt
     }
   }

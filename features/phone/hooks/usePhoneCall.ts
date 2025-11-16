@@ -138,11 +138,12 @@ export function usePhoneCall(): UsePhoneCallReturn {
   const [isCalling, setIsCalling] = useState<boolean>(false);
   const [isFollowUpOpen, setIsFollowUpOpen] = useState<boolean>(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
-  const [callDurationSeconds, setCallDurationSeconds] = useState<number | null>(
-    null
-  );
+  const [callDurationSeconds, setCallDurationSeconds] = useState<number | null>(null);
   const [activeLead, setActiveLead] = useState<ActiveLead>(null);
   const [incomingCallNumber, setIncomingCallNumber] = useState<string | null>(null);
+  const [callDetectionReady, setCallDetectionReady] = useState<boolean>(
+    Platform.OS !== "android"
+  );
 
   // Refs to avoid stale closures in AppState handler
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
@@ -167,9 +168,41 @@ export function usePhoneCall(): UsePhoneCallReturn {
     endCallRef.current = endCallCallback;
   }, [endCallCallback]);
 
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+
+    let active = true;
+    const verifyPermissions = async () => {
+      try {
+        const hasPhoneState = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE
+        );
+        if (active && hasPhoneState) {
+          setCallDetectionReady(true);
+        }
+      } catch (error) {
+        console.error("Error while checking call permissions:", error);
+      }
+    };
+
+    verifyPermissions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Handle call end detection via call detector
   useEffect(() => {
     if (Platform.OS === "web") {
+      return;
+    }
+
+    if (!callDetectionReady) {
+      callDetectorRef.current?.dispose();
+      callDetectorRef.current = null;
       return;
     }
 
@@ -267,7 +300,7 @@ export function usePhoneCall(): UsePhoneCallReturn {
       callDetectorRef.current?.dispose();
       callDetectorRef.current = null;
     };
-  }, []);
+  }, [callDetectionReady]);
 
   // Handle app state changes - detect when app returns from background after call
   useEffect(() => {
@@ -330,6 +363,7 @@ export function usePhoneCall(): UsePhoneCallReturn {
       if (!permissionsGranted) {
         return;
       }
+      setCallDetectionReady(true);
 
       if (opts?.leadId) {
         setActiveLead({
