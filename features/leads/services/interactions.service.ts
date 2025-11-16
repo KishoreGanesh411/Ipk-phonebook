@@ -4,6 +4,7 @@ import {
   LOG_LEAD_CALL,
   UPDATE_LEAD_DETAILS_AFTER_CALL,
   UPDATE_LEAD_REMARK,
+  UPDATE_LEAD_STATUS,
 } from "@/core/graphql/queries";
 
 export type InteractionChannel = "CALL" | "WHATSAPP" | "EMAIL" | "SMS" | "OTHER";
@@ -155,4 +156,21 @@ export async function logCallInteraction(input: {
       },
     },
   });
+}
+
+export async function updateLeadStatus(params: {
+  leadId: string;
+  status: string;
+}) {
+  const { leadId, status } = params;
+
+  const { data } = await apolloClient.mutate({
+    mutation: UPDATE_LEAD_STATUS,
+    variables: {
+      leadId,
+      status: status as any,
+    },
+  });
+
+  return data?.updateLeadStatus;
 }

@@ -673,6 +673,8 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
                 id: leadId,
                 name: lead.name ?? undefined,
                 phone: primaryPhone ?? undefined,
+                clientStage: lead.clientStage ?? null,
+                stageFilter: lead.stageFilter ?? null,
               }
             : callActiveLead
         }

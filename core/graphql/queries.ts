@@ -231,3 +231,13 @@ export const LOG_LEAD_CALL = gql`
   }
 `;
 
+export const UPDATE_LEAD_STATUS = gql`
+  mutation UpdateLeadStatus($leadId: ID!, $status: LeadStatus!) {
+    updateLeadStatus(leadId: $leadId, status: $status) {
+      id
+      status
+      updatedAt
+    }
+  }
+`;
+
