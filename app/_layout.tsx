@@ -18,11 +18,16 @@ export default function RootLayout() {
   const user = useAuthStore((s) => s.user);
   const hydrated = useAuthStore((s) => s.hydrated);
   const hydrate = useAuthStore((s) => s.hydrateUserFromGraphQL);
+  const initializeAuthState = useAuthStore((s) => s.initializeAuthState);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     setReady(true);
   }, [segments]);
+
+  useEffect(() => {
+    initializeAuthState();
+  }, [initializeAuthState]);
 
   useEffect(() => {
     if (!ready) return;
@@ -33,7 +38,7 @@ export default function RootLayout() {
     } else if (isSignedIn() && inAuthGroup) {
       router.replace("/(tabs)");
     }
-  }, [segments, ready, router, isSignedIn]);
+  }, [segments, ready, router, isSignedIn, user]);
 
   // Ensure profile is hydrated after app refresh when already signed in
   useEffect(() => {

@@ -1,4 +1,4 @@
-﻿diff --git a/node_modules/react-native-call-detection/android/build.gradle b/node_modules/react-native-call-detection/android/build.gradle
+diff --git a/node_modules/react-native-call-detection/android/build.gradle b/node_modules/react-native-call-detection/android/build.gradle
 index 8903c5f..e92452d 100644
 --- a/node_modules/react-native-call-detection/android/build.gradle
 +++ b/node_modules/react-native-call-detection/android/build.gradle
@@ -145,14 +145,42 @@ index d480f0f..1d27d56 100644
  
  import java.util.HashMap;
  import java.util.Map;
-@@ -24,7 +27,6 @@ public class CallDetectionManagerModule
-     private boolean wasAppInRinging = false;
-     private ReactApplicationContext reactContext;
-     private TelephonyManager telephonyManager;
--    private CallStateUpdateActionModule jsModule = null;
-     private CallDetectionPhoneStateListener callDetectionPhoneStateListener;
-     private Activity activity = null;
+@@ -43,13 +46,20 @@ public class CallDetectionManagerModule
+     @ReactMethod
+     public void startListener() {
+         if (activity == null) {
+             activity = getCurrentActivity();
++            if (activity == null) {
++                Log.e("CallDetection", "Activity is null, cannot start listener");
++                return;
++            }
+             activity.getApplication().registerActivityLifecycleCallbacks(this);
+         }
  
+         telephonyManager = (TelephonyManager) this.reactContext.getSystemService(
+                 Context.TELEPHONY_SERVICE);
++        if (telephonyManager == null) {
++            Log.e("CallDetection", "TelephonyManager is null, cannot start listener");
++            return;
++        }
+         callDetectionPhoneStateListener = new CallDetectionPhoneStateListener(this);
+         telephonyManager.listen(callDetectionPhoneStateListener,
+                 PhoneStateListener.LISTEN_CALL_STATE);
+@@ -58,8 +68,12 @@ public class CallDetectionManagerModule
+ 
+     @ReactMethod
+     public void stopListener() {
+-        telephonyManager.listen(callDetectionPhoneStateListener,
+-                PhoneStateListener.LISTEN_NONE);
++        if (telephonyManager != null && callDetectionPhoneStateListener != null) {
++            telephonyManager.listen(callDetectionPhoneStateListener,
++                    PhoneStateListener.LISTEN_NONE);
++        } else {
++            Log.w("CallDetection", "TelephonyManager or listener is null, cannot stop listener");
++        }
+         telephonyManager = null;
+         callDetectionPhoneStateListener = null;
+     }
 @@ -112,15 +114,14 @@ public class CallDetectionManagerModule
  
      @Override
@@ -171,7 +199,7 @@ index d480f0f..1d27d56 100644
                  }
  
                  //reset device state
-@@ -131,14 +132,28 @@ public class CallDetectionManagerModule
+@@ -131,15 +132,29 @@ public class CallDetectionManagerModule
              case TelephonyManager.CALL_STATE_OFFHOOK:
                  //Device call state: Off-hook. At least one call exists that is dialing, active, or on hold, and no calls are ringing or waiting.
                  wasAppInOffHook = true;

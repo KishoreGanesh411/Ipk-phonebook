@@ -1,9 +1,13 @@
+// app/(auth)/sign-in.tsx
+
 import { useRouter } from "expo-router";
+import { Eye, EyeOff } from "lucide-react-native";
 import { useRef, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -19,9 +23,6 @@ import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/core/theme/ThemeProvider";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 
-const DEMO_EMAIL = "bharath@ipkwealth.com";
-const DEMO_PASSWORD = "Ipk@2025";
-
 export const SignInScreen = () => {
   const theme = useTheme();
   const styles = makeStyles(theme);
@@ -31,9 +32,14 @@ export const SignInScreen = () => {
 
   const passwordRef = useRef<TextInput>(null);
   const { signIn, signingIn, error, hydrateUserFromGraphQL } = useAuthStore();
-  const [email, setEmail] = useState(DEMO_EMAIL);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [fetchingAfterLogin, setFetchingAfterLogin] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
+  };
 
   const handleSubmit = async () => {
     Keyboard.dismiss();
@@ -93,17 +99,32 @@ export const SignInScreen = () => {
               returnKeyType="next"
               onSubmitEditing={() => passwordRef.current?.focus()}
             />
-            <Field
-              ref={passwordRef}
-              label="Password"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              onSubmitEditing={handleSubmit}
-              returnKeyType="done"
-              blurOnSubmit={true}
-              error={error}
-            />
+
+            <View>
+              <Field
+                ref={passwordRef}
+                label="Password"
+                secureTextEntry={!isPasswordVisible}
+                value={password}
+                onChangeText={setPassword}
+                onSubmitEditing={handleSubmit}
+                returnKeyType="done"
+                blurOnSubmit={true}
+                error={error}
+              />
+
+              <Pressable
+                onPress={togglePasswordVisibility}
+                style={styles.passwordToggle}
+                accessibilityLabel={isPasswordVisible ? "Hide password" : "Show password"}
+              >
+                {isPasswordVisible ? (
+                  <EyeOff size={20} color={theme.colors.text} />
+                ) : (
+                  <Eye size={20} color={theme.colors.text} />
+                )}
+              </Pressable>
+            </View>
 
             <LoginButton
               label="Login"
@@ -113,9 +134,6 @@ export const SignInScreen = () => {
               style={styles.cta}
             />
 
-            <Text tone="muted" size="sm" style={styles.hint}>
-              Demo account — email: ipktest@ipkwealth.com | password: Ipk@2025
-            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -126,7 +144,6 @@ export const SignInScreen = () => {
 const makeStyles = (theme: ReturnType<typeof useTheme>) => {
   const s = theme.spacing ?? { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
   const r = theme.radii ?? { sm: 8, md: 12, lg: 16 };
-  // Let LoginButton control its blue color and border; keep only position/margins here.
 
   return StyleSheet.create({
     safe: {
@@ -161,6 +178,7 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) => {
     },
     subtitle: {
       textAlign: "center",
+      // title: SafeAreaFrameContext,
       paddingHorizontal: s.md,
     },
     form: {
@@ -178,10 +196,12 @@ const makeStyles = (theme: ReturnType<typeof useTheme>) => {
       alignSelf: "center",
       marginTop: s.md,
     },
-    hint: {
-      textAlign: "center",
-      marginTop: s.sm,
+    passwordToggle: {
+      position: "absolute",
+      right: s.sm,
+      top: 30,
+      padding: 5,
+      zIndex: 10,
     },
   });
 };
-

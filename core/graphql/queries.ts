@@ -218,3 +218,16 @@ export const ADD_LEAD_INTERACTION = gql`
   }
 `;
 
+export const LOG_LEAD_CALL = gql`
+  mutation LogLeadCall($input: LogLeadCallInput!) {
+    logLeadCall(input: $input) {
+      id
+      leadId
+      occurredAt
+      text
+      tags
+      type
+    }
+  }
+`;
+

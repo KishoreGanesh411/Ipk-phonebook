@@ -1,5 +1,5 @@
 ﻿// features/phone/components/CallFollowUpModal.tsx
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { logCallInteraction } from "../../leads/services/interactions.service";
+import { useCallMutations } from "../hooks/useCallMutations";
 
 export type LeadSummary = { id: string; name?: string; phone?: string } | null;
 
@@ -29,14 +29,25 @@ export default function CallFollowUpModal({
   const [notes, setNotes] = useState("");
   const [nextAction, setNextAction] = useState("");
   const [saving, setSaving] = useState(false);
+  const { logCall } = useCallMutations();
 
-  const handleSave = async () => {
+  const durationLabel = useMemo(
+    () => Math.max(1, Math.round(durationSeconds || 0)),
+    [durationSeconds]
+  );
+
+  const handleSave = useCallback(async () => {
+    if (!lead?.id) {
+      Alert.alert("Call Follow-up", "Unable to log call: lead is missing.");
+      return;
+    }
+
     try {
       setSaving(true);
-      await logCallInteraction({
-        leadId: lead?.id,
+      await logCall({
+        leadId: lead.id,
         phone: lead?.phone ?? "",
-        durationSeconds: Math.max(1, Math.round(durationSeconds || 0)),
+        durationSeconds: durationLabel,
         notes,
         nextAction,
       });
@@ -49,7 +60,7 @@ export default function CallFollowUpModal({
     } finally {
       setSaving(false);
     }
-  };
+  }, [durationLabel, lead, logCall, nextAction, notes, onClose]);
 
   const leadLine = lead?.name || lead?.phone ? `${lead?.name ?? ""}${lead?.name && lead?.phone ? " • " : ""}${lead?.phone ?? ""}` : null;
 
@@ -59,7 +70,7 @@ export default function CallFollowUpModal({
         <View style={styles.card}>
           <Text style={styles.title}>Call Follow-up</Text>
           {leadLine ? <Text style={styles.subtitle}>{leadLine}</Text> : null}
-          <Text style={styles.duration}>Call duration: {Math.max(1, Math.round(durationSeconds || 0))} sec</Text>
+          <Text style={styles.duration}>Call duration: {durationLabel} sec</Text>
 
           <View style={styles.field}>
             <Text style={styles.label}>Notes / Summary</Text>

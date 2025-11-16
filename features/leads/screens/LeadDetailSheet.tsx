@@ -23,6 +23,7 @@ import { LEAD_BASIC, LEAD_DETAIL_WITH_TIMELINE } from '@/core/graphql/queries';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { updateLeadAfterCall } from '@/features/leads/services/interactions.service';
 import { usePhoneCall } from '@/features/phone/hooks/usePhoneCall';
+import CallFollowUpModal from '@/features/phone/components/CallFollowUpModal';
 
 type Props = {
   leadId: string | null;
@@ -109,13 +110,15 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
     }
   }, [lead?.id, lead?.clientStage, lead?.stageFilter]);
 
+  // When follow-up modal opens, also open the log modal for stage updates
   React.useEffect(() => {
-    if (isFollowUpOpen) {
+    if (isFollowUpOpen && callDurationSeconds) {
       setChannel('CALL');
       setCallEndedAt(new Date().toISOString());
-      setLogOpen(true);
+      // Don't auto-open log modal, let CallFollowUpModal handle it first
+      // User can manually open log modal if needed for stage changes
     }
-  }, [isFollowUpOpen]);
+  }, [isFollowUpOpen, callDurationSeconds]);
 
   const lead = data?.leadDetailWithTimeline ?? basicData?.lead;
   const title = 'Lead identity';
@@ -125,6 +128,7 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
     isFollowUpOpen,
     callDurationSeconds,
     closeFollowUp,
+    activeLead: callActiveLead,
   } = usePhoneCall();
   const [callStartedAt, setCallStartedAt] = useState<string | null>(null);
   const [callEndedAt, setCallEndedAt] = useState<string | null>(null);
@@ -656,6 +660,30 @@ export default function LeadDetailSheet({ leadId, visible, onClose }: Props) {
           </View>
         </View>
       </Modal>
+
+      {/* Call Follow-up Modal */}
+      <CallFollowUpModal
+        visible={isFollowUpOpen && !!leadId}
+        durationSeconds={callDurationSeconds ?? 0}
+        lead={
+          callActiveLead?.id === leadId
+            ? callActiveLead
+            : leadId && lead
+            ? {
+                id: leadId,
+                name: lead.name ?? undefined,
+                phone: primaryPhone ?? undefined,
+              }
+            : callActiveLead
+        }
+        onClose={() => {
+          closeFollowUp();
+          // Optionally open log modal for stage updates after follow-up is saved
+          if (leadId) {
+            setLogOpen(true);
+          }
+        }}
+      />
     </>
   );
 }

@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client/react';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
@@ -9,6 +9,7 @@ import { LoadingState } from '@/components/feedback/LoadingState';
 import { LEADS_BY_STAGE_QUERY, STAGE_SUMMARY_QUERY } from '@/core/graphql/queries';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { usePhoneCall } from '@/features/phone/hooks/usePhoneCall';
 import LeadDetailSheet from './LeadDetailSheet';
 
 type StageKey =
@@ -104,13 +105,19 @@ export function StageLeadsScreen() {
     return (leadsData?.leadsByStage?.items ?? []).slice();
   }, [leadsData]);
 
-  const placeCall = async (phone: string) => {
-    const normalized = phone?.replace(/\s|[-()]/g, '');
-    const url = `tel:${normalized}`;
+  const { startCall } = usePhoneCall();
+
+  const placeCall = async (lead: LeadItem) => {
+    if (!lead.phone) return;
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) await Linking.openURL(url);
-    } catch {}
+      await startCall({
+        leadId: lead.id,
+        leadName: lead.name ?? undefined,
+        phone: lead.phone,
+      });
+    } catch (err) {
+      console.error('Failed to start call', err);
+    }
   };
 
   const openLead = (id: string) => {
@@ -170,7 +177,13 @@ export function StageLeadsScreen() {
                   <Text size="sm" tone="muted">{item.phone}</Text>
                   <Text size="sm" tone="muted">{item.leadSource ?? slugToLabel(item.clientStage ?? null)}</Text>
                 </View>
-                <Pressable style={styles.callButton} onPress={() => placeCall(item.phone)}>
+                <Pressable 
+                  style={styles.callButton} 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    placeCall(item);
+                  }}
+                >
                   <MaterialIcons name="call" size={18} color="#fff" />
                   <Text weight="bold" size="sm" style={{ color: '#fff', marginLeft: 6 }}>Call</Text>
                 </Pressable>

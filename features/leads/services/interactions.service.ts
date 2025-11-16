@@ -1,6 +1,7 @@
 import { apolloClient } from "@/core/graphql/apolloClient";
 import {
   ADD_LEAD_INTERACTION,
+  LOG_LEAD_CALL,
   UPDATE_LEAD_DETAILS_AFTER_CALL,
   UPDATE_LEAD_REMARK,
 } from "@/core/graphql/queries";
@@ -92,23 +93,56 @@ export async function logCallInteraction(input: {
   durationSeconds: number;
   notes: string;
   nextAction: string;
+  occurredAt?: string;
+  outcome?: string;
 }): Promise<void> {
-  const { leadId, phone, durationSeconds, notes, nextAction } = input;
+  const {
+    leadId,
+    phone,
+    durationSeconds,
+    notes,
+    nextAction,
+    occurredAt,
+    outcome,
+  } = input;
   if (!leadId) {
     console.warn("Skipping lead interaction: leadId missing");
     return;
   }
 
-  const normalizedPhone = phone?.trim();
+  const normalizedPhone = phone?.replace(/\s+/g, "").trim();
+  const sanitizedPhone = normalizedPhone || phone?.trim();
+  if (!sanitizedPhone) {
+    console.warn("Skipping call log: phone number missing");
+    return;
+  }
   const segments = [
     notes?.trim(),
     nextAction?.trim() ? `Next: ${nextAction.trim()}` : undefined,
-    normalizedPhone ? `Number: ${normalizedPhone}` : undefined,
+    sanitizedPhone ? `Number: ${sanitizedPhone}` : undefined,
     Number.isFinite(durationSeconds)
       ? `Duration: ${Math.max(1, Math.round(durationSeconds))}s`
       : undefined,
   ].filter((part): part is string => Boolean(part));
   const text = segments.join(" | ") || "Call follow-up";
+
+  const duration = Math.max(1, Math.round(durationSeconds || 0));
+  const logPayload = {
+    leadId,
+    phoneNumber: sanitizedPhone,
+    durationSec: duration,
+    direction: "OUTGOING" as const,
+    text,
+    occurredAt: occurredAt ?? new Date().toISOString(),
+    outcome:
+      (outcome as any) ??
+      (nextAction?.trim() ? "FOLLOW_UP_NEEDED" : "ANSWERED"),
+  };
+
+  await apolloClient.mutate({
+    mutation: LOG_LEAD_CALL,
+    variables: { input: logPayload },
+  });
 
   await apolloClient.mutate({
     mutation: ADD_LEAD_INTERACTION,

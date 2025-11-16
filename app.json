@@ -62,8 +62,8 @@
       "./plugins/with-android-support-fix"
     ],
     "extra": {
-      "EXPO_PUBLIC_GRAPHQL_URL": "http://192.168.0.114:3333/graphql",
-      "EXPO_PUBLIC_API_URL": "http://192.168.0.114:3333"
+      "EXPO_PUBLIC_GRAPHQL_URL": "http://192.168.90.161:3333/graphql",
+      "EXPO_PUBLIC_API_URL": "http://192.168.90.161:3333"
     },
     "experiments": {
       "typedRoutes": true,

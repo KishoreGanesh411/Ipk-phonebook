@@ -1,10 +1,12 @@
 // features/auth/store/auth.store.ts
-import { firebaseSignIn, firebaseSignOut } from '@/features/auth/services/auth.service';
+import { auth } from '@/core/firebase/firebaseConfig';
+import { firebaseSignIn, firebaseSignOut, buildAuthUserFromFirebaseUser } from '@/features/auth/services/auth.service';
 import { AuthUser, SignInPayload } from '@/features/auth/types';
 import { create } from 'zustand';
 import { storageClear } from '@/core/storage/storage';
 import { apolloClient } from '@/core/graphql/apolloClient';
 import { ME_QUERY } from '@/core/graphql/queries';
+import { onAuthStateChanged } from 'firebase/auth';
 
 type AuthState = {
   user?: AuthUser;
@@ -14,8 +16,11 @@ type AuthState = {
   hydrateUserFromGraphQL: () => Promise<void>;
   signOut: () => Promise<void>;
   isSignedIn: () => boolean;
+  initializeAuthState: () => void;
   hydrated: boolean;
 };
+
+let authStateUnsubscribe: (() => void) | null = null;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: undefined,
@@ -81,6 +86,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await firebaseSignOut();
     await storageClear();
     set({ user: undefined, error: undefined, hydrated: false });
+  },
+
+  initializeAuthState() {
+    if (authStateUnsubscribe) {
+      return;
+    }
+    authStateUnsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        set({ user: undefined, hydrated: false });
+        return;
+      }
+      const persistedUser = await buildAuthUserFromFirebaseUser(firebaseUser);
+      set({ user: persistedUser, hydrated: false });
+    });
   },
 
   isSignedIn() {
