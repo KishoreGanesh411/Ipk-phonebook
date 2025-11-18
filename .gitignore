@@ -1,71 +1,95 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# -------------------------------------------------------------------------
+# 💻 Dependencies and Build Directories (CRITICAL for sharing)
+# -------------------------------------------------------------------------
+# Dependency Directory
+/node_modules
 
-# dependencies
-node_modules/
-
-# Expo
+# Generated Build Artifacts and Caches
+/build/
+/dist/
+/web-build/
 .expo/
-dist/
-web-build/
-expo-env.d.ts
+.expo-shared/
+.gradle/
 
-# Native
+# Android Native Build Artifacts
+/android/build
+/android/app/build
+/android/.gradle
+/android/local.properties
+/android/*.iml
 .kotlin/
 *.orig.*
+Android
+Studio/
+# iOS Native Build Artifacts (Pods must be re-installed on new machines)
+/ios/build
+/ios/DerivedData/
+/ios/Pods/
+/ios/Podfile.lock
+*.xcarchive
+*.ipa
+
+# -------------------------------------------------------------------------
+# 🔒 Sensitive and Local Environment Files (Security & Conflicts)
+# -------------------------------------------------------------------------
+# Environment Variables (ALWAYS IGNORE sensitive info)
+.env
+.env.local
+.env.production
+.env.development
+.env*.local
+!.env.staging # Keep this line if you intentionally want to track staging config
+
+# Native/Cloud Security Keys and Credentials
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
 *.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android
-/project-structure.md
-
-# Firebase credentials and keys
+google-services.json
+GoogleService-Info.plist
 firebase.json
 firestore.indexes.json
 firestore.rules
 storage.rules
-google-services.json
-GoogleService-Info.plist
 firebaseConfig.js
 /config/firebase/
-# Environment variables
-.env
-.env.local
-.env.production
-.env.development
-package-lock.json
-app.json
-# Build caches
-.expo-shared/
-.gradle/
-build/
 
-# IDE/editor configs
+# -------------------------------------------------------------------------
+# ⚙️ IDE and OS Specific Files (Avoid Conflicts)
+# -------------------------------------------------------------------------
+# macOS Files
+.DS_Store
+
+# IDE/Editor Configs
 .vscode/
 .idea/
 *.iml
-package-lock.json
+
+# -------------------------------------------------------------------------
+# 🐛 Debugging and Lock Files (Temporary/Generated)
+# -------------------------------------------------------------------------
+# Lock files - typically `yarn.lock` or `pnpm-lock.yaml` is tracked, but you
+# often want to ignore `package-lock.json` if using yarn/pnpm.
+package-lock.json # Ignore if using Yarn or pnpm
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.metro-health-check*
+
+# Typescript
+*.tsbuildinfo
+expo-env.d.ts
+
+# Other project-specific files
+/project-structure.md
+app-example/
+README_copy.txt
+
+/android/build
+/android/app/build
+/android/.gradle
+/android/local.properties
+/android/*.iml
